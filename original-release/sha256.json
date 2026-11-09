@@ -1,0 +1,129 @@
+{
+  "files": [
+    {
+      "path": "Assets/mro-helper-green-icon.ico",
+      "size": 60545,
+      "sha256": "fc08c0b14f089b212f09a18518a3750bddf4b8ea0c077f62e5983c8e67951451"
+    },
+    {
+      "path": "Assets/mro-main-red-icon.ico",
+      "size": 84739,
+      "sha256": "31e9422be0da5440c25040dc79ca7e498f34dc809c7bcdcbf65cc83fcb87e401"
+    },
+    {
+      "path": "Install-MRO.cmd",
+      "size": 318,
+      "sha256": "340d390eba1e83cd3bda6b52fb7168f88aa85aba3051a5f2bcadac93328a43c2"
+    },
+    {
+      "path": "Install-MRO.ps1",
+      "size": 5062,
+      "sha256": "ea238ce2193f632edaa43e18783999a9707d1a1269540e8b2384b41626e9bf93"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.Core.dll",
+      "size": 155648,
+      "sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.Core.pdb",
+      "size": 44856,
+      "sha256": "98ea2a9a93e054a4295b2662207bac13392e803ec8043bb53bc2fdce91e4d1ab"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.HelperApp.deps.json",
+      "size": 709,
+      "sha256": "01165e4dcd40cd48bbdb3f6f4d0c0fa7d4ee5cdd08c24bbb05cd7b0ab2dc88cf"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.HelperApp.dll",
+      "size": 1389568,
+      "sha256": "9e17556d196f499bdc1ce24f4df75a57bfe13f383da3d887a7d6fa9344810422"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.HelperApp.exe",
+      "size": 203776,
+      "sha256": "74a38c5f7daa7c3656e2ed72cd15e4cd1034098619458df69c40a3a457060eb7"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.HelperApp.pdb",
+      "size": 19004,
+      "sha256": "3f248f13aa636420c2f647fa000c00d237e6d66eaf23daef6f08b0e6b10a3564"
+    },
+    {
+      "path": "Mro.HelperApp/Mro.HelperApp.runtimeconfig.json",
+      "size": 458,
+      "sha256": "c71152bf25e40d647b2440c5b39be157a3d356106be9d5b678ab97bb87b4e782"
+    },
+    {
+      "path": "Mro.MainApp/Mro.Core.dll",
+      "size": 155648,
+      "sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20"
+    },
+    {
+      "path": "Mro.MainApp/Mro.Core.pdb",
+      "size": 44856,
+      "sha256": "98ea2a9a93e054a4295b2662207bac13392e803ec8043bb53bc2fdce91e4d1ab"
+    },
+    {
+      "path": "Mro.MainApp/Mro.MainApp.deps.json",
+      "size": 703,
+      "sha256": "04de81901f7aacb6f5fa4869a022a3cd1dcbc46baec8be85187a02318d467e28"
+    },
+    {
+      "path": "Mro.MainApp/Mro.MainApp.dll",
+      "size": 1439744,
+      "sha256": "4de0dd0d0157d55ad7485c2c65f0756646425b8cfbc1432a72cb8e6b61990789"
+    },
+    {
+      "path": "Mro.MainApp/Mro.MainApp.exe",
+      "size": 227840,
+      "sha256": "a526172bf5130402dfad39da99ecab722aac8b2dae9cd6446f5a85207af5dfbe"
+    },
+    {
+      "path": "Mro.MainApp/Mro.MainApp.pdb",
+      "size": 19564,
+      "sha256": "d57afe6eef1d63f1af4839c63b13937b87ac7acf6754858405e89527956fc9e0"
+    },
+    {
+      "path": "Mro.MainApp/Mro.MainApp.runtimeconfig.json",
+      "size": 458,
+      "sha256": "c71152bf25e40d647b2440c5b39be157a3d356106be9d5b678ab97bb87b4e782"
+    },
+    {
+      "path": "SharedContent/W250905.xlsx",
+      "size": 9975,
+      "sha256": "fafd864e99eff9ed532f01851e3760d0062ac93a3989894fefe04b3780287416"
+    },
+    {
+      "path": "SharedContent/检测报告1.xls",
+      "size": 41472,
+      "sha256": "b041f0144311073c9f26e003e2d1aef2bf5bb671a35ad954b909afdc21dc04fc"
+    },
+    {
+      "path": "SharedContent/检测报告1.xlsx",
+      "size": 13948,
+      "sha256": "dc874b63574b8f848d97e07196e9044ab0503d5724d98886df74fd0fc18403b9"
+    },
+    {
+      "path": "SharedContent/检测报告2.xlsx",
+      "size": 12188,
+      "sha256": "f2b48bf518fddf90ce224e834f8d8bbe2b9404d3eea22a212ad41106fb72636f"
+    },
+    {
+      "path": "SharedContent/检测标准表.xlsx",
+      "size": 23850,
+      "sha256": "7b22f5c8f1cd641f1476cae3be75942688bd6be8ae0ac173562a2917daaaa32a"
+    },
+    {
+      "path": "TEST_STEPS.md",
+      "size": 2341,
+      "sha256": "329024aa60cdc112f6abaa2ff3c093a1a1c2bc60c648e0a6c819c0c4cae6e9ef"
+    },
+    {
+      "path": "Uninstall-MRO.ps1",
+      "size": 675,
+      "sha256": "1cdb37d495578701135ed4693920baa3e3c35c81ce000de88a32ed6910245f56"
+    }
+  ]
+}

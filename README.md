@@ -2,6 +2,8 @@
 
 本节点交接见 **[HANDOFF.md](HANDOFF.md)**。其中列明恢复依据、差异、Windows 测试和后续 Git 上传范围。
 
+原始发布文件完整保存在 **[original-release/MRO-Windows-x64](original-release/MRO-Windows-x64/)**，包含 EXE、DLL、PDB、运行配置、Excel 和安装脚本，供 Windows 对照及后续恢复。文件哈希和验证说明见 [original-release/README.md](original-release/README.md)。
+
 两个窗口的 XAML 从保留的 BAML 解析得到，原 Logo、窗口图标、尺寸、布局与样式已复用。窗口事件和 Core 数据流程为重新实现，**不是恢复了全部原业务源码，也未验证能否编译和运行**。
 
 本版提供标准表导入、称重 XLSX 导入、条码关联、抽样数量校验、真实测量报告、辅助称重表导出及共享操作日志。报告统计已导入的测量值。

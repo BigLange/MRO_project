@@ -1,0 +1,36 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Mro.MainApp/1.0.0": {
+        "dependencies": {
+          "Mro.Core": "1.0.0"
+        },
+        "runtime": {
+          "Mro.MainApp.dll": {}
+        }
+      },
+      "Mro.Core/1.0.0": {
+        "runtime": {
+          "Mro.Core.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Mro.MainApp/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mro.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

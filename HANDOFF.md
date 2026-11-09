@@ -57,6 +57,7 @@ artifacts/windows/HelperApp/Mro.HelperApp.exe
 
 ## 检查与证据
 
+- `original-release/MRO-Windows-x64/`：保留的原始发布目录，含程序、DLL、PDB、Excel、资源及安装/卸载脚本。`original-release/sha256.json` 用于校验文件；只排除 macOS 的 `.DS_Store`。
 - `scripts/verify_recovery.py`：XAML、资源、绑定、事件、工程引用和空白模板静态检查。
 - `docs/syntax-checks.json`：C# 和 PowerShell 语法解析结果，不等于编译或执行结果。
 - `tests/Mro.Core.Specs/Program.cs`：抽样边界、判定、生产表、偏好、模板分页和数据保留的运行检查；待 Windows/.NET 执行。
@@ -67,6 +68,6 @@ artifacts/windows/HelperApp/Mro.HelperApp.exe
 
 ## Git 交接
 
-工程可单独提交 `MRO-Recovered/`，构建不依赖原发布目录。若同时保留恢复过程，再纳入 `recovery-assessment/`、根 README、`.gitignore` 和 `.gitattributes`。不要纳入 `bin/`、`obj/`、`artifacts/` 等生成目录。
+仓库根目录为本地 `MRO-Recovered/`。恢复工程源码与 `original-release/` 下的原始发布文件一同提交，便于 Windows 上继续对照；构建仍不依赖原 DLL。不要纳入 `bin/`、`obj/`、`artifacts/` 等生成目录。
 
 上传目标：`https://github.com/BigLange/MRO_project.git`，本地分支为 `main`，工程根目录即仓库根目录。已准备本地提交与远程配置；当前执行环境无法连接 GitHub 的443端口，远端分支状态尚未核实，推送结果以实际命令输出为准。客户端新需求、正式法规核验和 Windows 实测修复属于下一节点。

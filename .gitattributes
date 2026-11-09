@@ -13,3 +13,7 @@
 *.xlsx binary
 *.xls binary
 *.baml binary
+*.exe binary
+*.dll binary
+*.pdb binary
+original-release/MRO-Windows-x64/** -text -diff -merge
