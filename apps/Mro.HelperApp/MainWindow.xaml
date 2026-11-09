@@ -22,7 +22,7 @@
         <Setter Property="Background" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
         <Setter Property="Padding" Value="16,9" />
-        <Setter Property="Margin" Value="0,0,10,0" />
+        <Setter Property="Margin" Value="0,0,10,8" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FrameworkElement.Cursor" Value="Hand" />
       </Style>
@@ -80,7 +80,7 @@
             </Border>
             <StackPanel Grid.Column="1">
               <TextBlock FontSize="32" FontWeight="Bold" Foreground="#F8FBF5" Text="马里奥产品抽检辅助系统" />
-              <TextBlock Margin="0,8,0,0" FontSize="14" Foreground="#D2DFC9" Text="读取共享标准库与真实称重记录，核对条码和抽样数量，导出实测称重数据 Excel。" />
+              <TextBlock Margin="0,8,0,0" FontSize="14" Foreground="#D2DFC9" TextWrapping="Wrap" Text="读取共享标准库中的条码与抽样规则，生成一份合格称重数据 Excel。" />
             </StackPanel>
             <Border Grid.Column="2" Background="#26342A" CornerRadius="20" Padding="18">
               <StackPanel>
@@ -131,18 +131,17 @@
           <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,18,0">
             <DockPanel>
               <StackPanel DockPanel.Dock="Top">
-                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="实测条目" />
-                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" Text="导入真实称重记录，为每一行输入条码和抽样基数，核对实测数量。" />
-                <StackPanel Margin="0,16,0,0" Orientation="Horizontal">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="生成条目" />
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Text="为每一行输入条码和抽样基数，系统会预览应生成的样品数量。" />
+                <WrapPanel Margin="0,16,0,0">
                   <Button Content="新增条目" Click="AddEntry_Click" Name="RecoveredControl3" />
-                  <Button Content="导入实测Excel" Click="ImportMeasurements_Click" Name="RecoveredControl4" />
-                  <Button Content="导入生产表" Click="ImportProduction_Click" Name="ImportProductionButton" />
+                  <Button Content="导入Excel" Click="ImportProduction_Click" Name="RecoveredControl4" />
                   <Button Content="删除选中" Click="DeleteEntry_Click" Name="RecoveredControl5" />
-                  <Button Content="检查样品数" Click="CheckSamples_Click" Name="RecoveredControl6" />
-                  <Button Content="导出实测称重表" Click="ExportMeasurements_Click" Name="RecoveredControl7" />
-                </StackPanel>
+                  <Button Content="预览样品数" Click="CheckSamples_Click" Name="RecoveredControl6" />
+                  <Button Content="生成标准表" Click="ExportMeasurements_Click" Name="RecoveredControl7" />
+                </WrapPanel>
               </StackPanel>
-              <DataGrid Name="EntryGrid">
+              <DataGrid Name="EntryGrid" MinColumnWidth="95" MinHeight="160">
                 <DataGrid.ItemsSource>
                   <Binding Path="EntryRows" />
                 </DataGrid.ItemsSource>
@@ -155,7 +154,7 @@
                       <Binding Path="Barcode" UpdateSourceTrigger="PropertyChanged" />
                     </DataGridTextColumn.Binding>
                   </DataGridTextColumn>
-                  <DataGridTextColumn Header="样品名称" Width="2*" IsReadOnly="True">
+                  <DataGridTextColumn Header="样品名称" Width="2*" MinWidth="160" IsReadOnly="True">
                     <DataGridTextColumn.Binding>
                       <Binding Path="ProductName" />
                     </DataGridTextColumn.Binding>
@@ -165,7 +164,7 @@
                       <Binding Path="BatchSizeText" UpdateSourceTrigger="PropertyChanged" />
                     </DataGridTextColumn.Binding>
                   </DataGridTextColumn>
-                  <DataGridTextColumn Header="实测样品数" Width="0.9*" IsReadOnly="True">
+                  <DataGridTextColumn Header="最大值(g)" Width="0.9*" MinWidth="95">
                     <DataGridTextColumn.Binding>
                       <Binding Path="MaximumWeightText" UpdateSourceTrigger="PropertyChanged" />
                     </DataGridTextColumn.Binding>
@@ -183,7 +182,7 @@
             <Border Style="{StaticResource CardStyle}">
               <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleStyle}" Text="运行日志" />
-                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" Text="按应用、操作名和结果查看最近操作记录，便于回溯共享标准库加载和表 2 生成过程。" />
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Text="按应用、操作名和结果筛选运行日志。" />
                 <Grid Margin="0,14,0,0">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.05*" />
@@ -291,8 +290,8 @@
             </Border>
             <Border Style="{StaticResource CardStyle}">
               <StackPanel>
-                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="实测规则" />
-                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Text="只导出已导入的真实称重记录，统一换算为 g；样品不足时提示缺测，不自动补值或改变测量结果。" />
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="生成规则" />
+                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Text="辅助应用生成的称重数据必须全部为 Pass。当前规则是：重量落在 [标准克重, 标准克重 + 允许短缺量]，并统一输出为 g。" />
               </StackPanel>
             </Border>
           </StackPanel>

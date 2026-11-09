@@ -42,5 +42,9 @@
   {
     "path": "apps/Mro.MainApp/Assets/new_mario_title_logo.png",
     "sha256": "d9344d834b69454b33f652ed99385ce86d7d4a649b4350e2bd9b9d8a77b4b3d8"
+  },
+  {
+    "path": "SharedContent/WeighingTemplate.xlsx",
+    "sha256": "fafd864e99eff9ed532f01851e3760d0062ac93a3989894fefe04b3780287416"
   }
 ]

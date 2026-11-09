@@ -7,7 +7,7 @@ namespace Mro.Core;
 // New implementation for measured data; these are not decompiled business models.
 public sealed record ProductStandard(string Barcode, string Code, string ProductName, decimal StandardGrams,
     string Category, string Requirement, string InspectionBasis, string SourceLocation,
-    decimal? AllowedShortageGrams = null, string SensoryRequirement = "");
+    decimal? AllowedShortageGrams = null, string SensoryRequirement = "", decimal? FloatingRatioPercent = null);
 
 public sealed record SamplingRule(int MinimumBatch, int MaximumBatch, int SampleCount, bool SampleEntireBatch = false,
     int AllowedT1Count = 0, int AllowedT2Count = 0);
@@ -40,11 +40,26 @@ public sealed record StandardCatalog(List<ProductStandard> Products, List<Sampli
 }
 
 public sealed record Measurement(string Barcode, decimal Grams, string Date, string Time,
-    decimal? TareGrams, decimal? GrossGrams, string SourceFile, string SourceSheet, int SourceRow, string RecordId);
+    decimal? TareGrams, decimal? GrossGrams, string SourceFile, string SourceSheet, int SourceRow, string RecordId,
+    string DataOrigin = "导入记录", string BatchId = "", int? BatchSize = null, string ProductionDate = "", string SensoryResult = "", decimal? MaximumWeightGrams = null)
+{
+    public string Key => InspectionKey.For(Barcode, BatchId);
+}
 
-public sealed record InspectionGroup(ProductStandard Product, int BatchSize, int RequiredSamples, List<Measurement> Measurements)
+public static class InspectionKey
+{
+    public static string For(string barcode, string batchId = "")
+    {
+        barcode = barcode.Trim(); batchId = batchId.Trim();
+        if (barcode.Contains('\u001f') || batchId.Contains('\u001f')) throw new InvalidDataException("条码或批号包含无效分隔符。");
+        return batchId.Length == 0 ? barcode : barcode + '\u001f' + batchId;
+    }
+}
+
+public sealed record InspectionGroup(ProductStandard Product, int BatchSize, int RequiredSamples, List<Measurement> Measurements, string BatchId = "")
 {
     public decimal AverageGrams => Measurements.Average(m => m.Grams);
+    public string Key => InspectionKey.For(Product.Barcode, BatchId);
 }
 
 public static class DataFiles
@@ -83,27 +98,28 @@ public static class InspectionValidator
     public static List<InspectionGroup> Validate(StandardCatalog catalog, IReadOnlyList<Measurement> measurements,
         IReadOnlyDictionary<string, string> batchSizes)
     {
-        if (measurements.Count == 0) throw new InvalidDataException("没有真实称重记录。");
-        if (batchSizes.Keys.Except(measurements.Select(m => m.Barcode)).Any())
+        if (measurements.Count == 0) throw new InvalidDataException("没有称重记录。");
+        if (batchSizes.Keys.Except(measurements.Select(m => m.Key)).Any())
             throw new InvalidDataException("存在没有实测记录的生产条目，请补充测量记录或移除空条目。");
         if (measurements.Select(m => m.RecordId).Distinct().Count() != measurements.Count)
             throw new InvalidDataException("发现重复测量记录 ID，不能重复计算同一次测量。");
         var groups = new List<InspectionGroup>();
         var errors = new List<string>();
-        foreach (var group in measurements.GroupBy(m => m.Barcode))
+        foreach (var group in measurements.GroupBy(m => m.Key))
         {
             try
             {
-                var product = catalog.Resolve(group.Key);
+                var first = group.First();
+                var product = catalog.Resolve(first.Barcode);
                 if (!batchSizes.TryGetValue(group.Key, out var text)) throw new InvalidDataException($"条码 {group.Key} 缺少抽样基数。");
                 var batch = DataFiles.PositiveInteger(text, "抽样基数");
                 var required = catalog.RequiredSamples(batch);
                 var actual = group.ToList();
-                if (required > batch) throw new InvalidDataException($"条码 {group.Key}：应抽样数大于生产数量，请核实规则。");
-                if (actual.Count < required) throw new InvalidDataException($"条码 {group.Key} 缺测：应有 {required} 条，实测 {actual.Count} 条。");
-                if (actual.Count > batch) throw new InvalidDataException($"条码 {group.Key}：实测数量超过抽样基数，请核实重复记录。");
                 if (actual.Any(m => m.Grams <= 0)) throw new InvalidDataException($"条码 {group.Key} 存在非正数测量值。");
-                groups.Add(new(product, batch, required, actual));
+                foreach (var field in new[] { actual.Select(m => m.ProductionDate), actual.Select(m => m.SensoryResult), actual.Select(m => m.BatchSize?.ToString() ?? "") })
+                    if (field.Where(v => v.Length > 0).Distinct().Count() > 1)
+                        throw new InvalidDataException($"条码 {first.Barcode} 同一批次的数量、日期或感官结果不一致。");
+                groups.Add(new(product, batch, required, actual, first.BatchId));
             }
             catch (InvalidDataException ex) { errors.Add(ex.Message); }
         }

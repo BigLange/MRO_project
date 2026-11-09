@@ -24,14 +24,19 @@ public static class StandardImporter
             // Product rows must have a serial number. The footer contains separate rules.
             if (!int.TryParse(row.At(1), out var serial) || serial <= 0) continue;
             var barcode = DataFiles.Identifier(row.At(barcodeColumn));
+            if (products.Any(p => p.Barcode == barcode)) continue; // Original importer keeps the first matching barcode.
             var name = row.At(nameColumn); var code = row.At(codeColumn);
             if (barcode.Length == 0 || name.Length == 0 || code.Length == 0) throw new InvalidDataException($"标准表第 {row.Number} 行缺少条码、编码或名称。");
             var weight = DataFiles.Decimal(row.At(weightColumn), $"标准表第 {row.Number} 行规格");
             if (weight <= 0) throw new InvalidDataException($"标准表第 {row.Number} 行规格必须大于零。");
             if (row.Cells[barcodeColumn].IsNumeric) warnings.Add($"第 {row.Number} 行条码为数字单元格，原前导零无法推断，请核对。");
-            var shortage = DataFiles.Decimal(row.At(10), $"标准表第 {row.Number} 行允许短缺量");
+            var shortageText = row.At(10);
+            var shortage = DataFiles.Decimal(shortageText, $"标准表第 {row.Number} 行允许短缺量");
             if (shortage < 0 || shortage >= weight) throw new InvalidDataException($"标准表第 {row.Number} 行允许短缺量必须非负且小于规格。");
-            products.Add(new(barcode, code, name, weight, row.At(Optional("样品分类")), row.At(8), row.At(Optional("检验依据")), row.At(Optional("取样地点")), shortage, row.At(7)));
+            row.Cells.TryGetValue(Optional("浮动比例"), out var ratioCell);
+            var ratio = ReadFloatingRatio(ratioCell, row.Number);
+            if (ratio is null) warnings.Add($"第 {row.Number} 行浮动比例为空或无效，生成时需手填最大重量（可填数字110、数值百分比110%或文字110%，比例须≥100%）。");
+            products.Add(new(barcode, code, name, weight, row.At(Optional("样品分类")), row.At(8), row.At(Optional("检验依据")), row.At(Optional("取样地点")), shortage, row.At(7), ratio));
         }
         if (products.Count == 0) throw new InvalidDataException("标准表中没有有效产品。");
         foreach (var duplicate in products.GroupBy(p => p.Barcode).Where(g => g.Count() > 1))
@@ -43,9 +48,23 @@ public static class StandardImporter
                 ?? throw new InvalidDataException("sampling-plan.json 为空。")
             : ReadRecoveredRules(sheet);
         ValidateRules(rules);
-        warnings.Add("抽样区间和 T1/T2 采用原程序口径，尚未独立核实法规；部分小批量的应抽数可能超过批量，会阻止导出。");
-        warnings.Add("允许短缺量按原程序读取 J 列，净含量文字要求读取 H 列；两列可能不一致，报告会显示待复核说明。");
         return new(products, rules, Path.GetFullPath(path), DataFiles.Sha256(path), warnings);
+    }
+
+    private static decimal? ReadFloatingRatio(SheetCell? cell, int row)
+    {
+        var text = cell?.Text.Replace("％", "%").Trim() ?? "";
+        var percentText = text.EndsWith('%');
+        var number = percentText ? text[..^1].Trim() : text;
+        if (!decimal.TryParse(number, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var value))
+        {
+            if (cell?.IsFormula == true)
+                throw new InvalidDataException($"标准表第 {row} 行浮动比例公式缺少有效计算结果，请在Excel/WPS中重新计算并保存后导入。");
+            return null;
+        }
+        // Only this column accepts a formula's saved result. Other input formula checks stay in SheetRow.At.
+        if (!percentText && cell is { IsNumeric: true, IsPercentage: true }) value *= 100m;
+        return value >= 100m ? value : null;
     }
 
     private static List<SamplingRule> ReadRecoveredRules(WorkbookSheet sheet)
@@ -120,11 +139,6 @@ public static class MeasurementImporter
                     var n = DataFiles.Decimal(text, name) * factor;
                     return n >= 0 ? n : throw new InvalidDataException($"第 {row.Number} 行{name}不能是负数。");
                 }
-                var originFile = row.At(Col("来源文件")); var originSheet = row.At(Col("来源工作表"));
-                var originRow = row.At(Col("来源行")); var recordId = row.At(Col("测量记录ID"));
-                var hasOrigin = originFile.Length > 0 && originSheet.Length > 0 && int.TryParse(originRow, out var parsedRow) && parsedRow > 0;
-                if (!hasOrigin && (originFile.Length > 0 || originSheet.Length > 0 || originRow.Length > 0 || recordId.Length > 0))
-                    throw new InvalidDataException($"第 {row.Number} 行来源字段不完整。");
                 string Temporal(string field, bool date)
                 {
                     var column = Col(field); var text = row.At(column);
@@ -136,9 +150,7 @@ public static class MeasurementImporter
                     return instant.ToString(date ? "yyyy-MM-dd" : "HH:mm:ss.fff", CultureInfo.InvariantCulture);
                 }
                 result.Add(new(barcode, weight, Temporal("日期", true), Temporal("时间", false), OptionalWeight("皮重"), OptionalWeight("毛重"),
-                    hasOrigin ? originFile : Path.GetFullPath(path), hasOrigin ? originSheet : sheet.Name,
-                    hasOrigin ? int.Parse(originRow) : row.Number,
-                    hasOrigin && recordId.Length > 0 ? recordId : $"{hash}:{sheet.Name}:{row.Number}"));
+                    Path.GetFullPath(path), sheet.Name, row.Number, $"{hash}:{sheet.Name}:{row.Number}"));
             }
         }
         if (matchedSheets == 0) throw new InvalidDataException("未找到包含扫描、重量和单位列的称重工作表。");

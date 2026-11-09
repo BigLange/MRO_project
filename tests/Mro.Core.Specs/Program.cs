@@ -3,202 +3,262 @@ using System.IO.Compression;
 using System.Xml.Linq;
 using Mro.Core;
 
-// Explicit test fixtures, never production measurements. No random data generator.
-var temporary = Path.Combine(Path.GetTempPath(), "Mro-Recovered-Specs-" + Guid.NewGuid().ToString("N"));
+var temporary = Path.Combine(Path.GetTempPath(), "Mro-Legacy-Specs-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temporary);
 var passed = 0;
-void Assert(bool condition, string message)
-{
-    if (!condition) throw new Exception(message);
-}
+void Assert(bool condition, string message) { if (!condition) throw new Exception(message); }
 void Reject(Action action, string message)
 {
-    try { action(); }
-    catch (Exception ex) when (ex is InvalidDataException or IOException) { return; }
+    try { action(); } catch (Exception ex) when (ex is InvalidDataException or IOException) { return; }
     throw new Exception(message);
 }
-void Test(string name, Action action)
-{
-    action(); passed++; Console.WriteLine("PASS " + name);
-}
+void Test(string name, Action action) { action(); passed++; Console.WriteLine("PASS " + name); }
 string Temp(string name) => Path.Combine(temporary, name);
-string Fixture(string name, string unit, params decimal[] values)
-{
-    var rows = new List<object?[]> { ["序号", "日期", "时间", "皮重", "重量", "毛重", "单位", "扫描"] };
-    rows.AddRange(values.Select((v, i) => new object?[] { i + 1, "TEST-ONLY", $"12:00:{i:00}", 0, v, v, unit, "0011010116" }));
-    var path = Temp(name);
-    XlsxWriter.Write(path, [new("测试数据_非实际测量", rows)]);
-    return path;
-}
-
+string Content(string name) => Path.Combine(AppContext.BaseDirectory, "SharedContent", name);
+XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+XElement Xml(string path, string entry) { using var z = ZipFile.OpenRead(path); using var stream = z.GetEntry(entry)!.Open(); return XElement.Load(stream); }
 try
 {
-    var standard = Path.Combine(AppContext.BaseDirectory, "SharedContent", "检测标准表.xlsx");
+    var standard = Content("检测标准表.xlsx");
+    var originalHash = DataFiles.Sha256(standard);
     var catalog = StandardImporter.Read(standard);
-    Test("standard table: product rows separated from rules, leading-zero identifiers preserved", () =>
+    var product = catalog.Resolve("0011010116");
+    var reportTemplate = Content(Path.Combine("ReferenceReports", "检测报告2.xlsx"));
+    var detailTemplate = Content(Path.Combine("ReferenceReports", "检测报告1.xlsx"));
+    List<Measurement> Records(params decimal[] weights) => weights.Select((w, i) => new Measurement(product.Barcode, w, "2026.11.09", $"12:00:{i:00}", 0m, w,
+        "TEST-ONLY", "原始数据", i + 2, "TEST-" + i)).ToList();
+    Dictionary<string, string> Batches(int batch) => new() { [product.Barcode] = batch.ToString() };
+    var measurements = Records(91m, 89m, 90m);
+    string RatioWorkbook(string label, string value, bool numeric = false, bool percentage = false, string? formula = null)
     {
-        Assert(catalog.Products.Count == 106, "Expected 106 products.");
-        Assert(catalog.Resolve("0011010116").ProductName == "迷你毛毛虫（面包）", "Barcode changed.");
-        Assert(catalog.Products.Any(p => p.Barcode == "4801000353"), "Numeric barcode changed.");
-        Assert(catalog.ImportWarnings.Any(w => w.Contains("重复条码")), "Missing duplicate warning.");
-        Reject(() => catalog.Resolve("0011010178"), "Ambiguous barcode must not resolve.");
-        Reject(() => catalog.Resolve("AF12566"), "Unknown barcode must not resolve.");
-    });
-    Test("sampling: recovered upper-bound intervals and limits", () =>
-    {
-        Assert(catalog.RequiredSamples(3) == 3 && catalog.RequiredSamples(40) == 32, "Explicit rules changed.");
-        Assert(catalog.RequiredSamples(30) == 32, "Recovered rule is an upper bound, not a single typical value.");
-        (int Lower, int Upper, int Count, int T1)[] recovered = [
-            (21,40,32,1), (41,60,35,1), (61,80,47,2), (81,100,49,2), (101,200,64,3),
-            (201,300,67,3), (301,400,81,4), (401,500,81,4), (501,100000,98,5) ];
-        foreach (var (lower, upper, count, t1) in recovered)
+        var path = Temp(label + ".xlsx");
+        File.Copy(standard, path);
+        var sheets = XlsxReader.Read(standard);
+        var index = sheets.FindIndex(s => s.Rows.Any(r => r.Cells.Values.Any(c => c.Text == "浮动比例")));
+        var sheet = sheets[index];
+        var column = sheet.Rows.SelectMany(r => r.Cells).First(c => c.Value.Text == "浮动比例").Key;
+        var row = sheet.Rows.First(r => r.Cells.Values.Any(c => c.Text == product.Barcode)).Number;
+        using var zip = ZipFile.Open(path, ZipArchiveMode.Update);
+        XElement Read(string part) { using var stream = zip.GetEntry(part)!.Open(); return XElement.Load(stream); }
+        void Save(string part, XElement xml) { zip.GetEntry(part)!.Delete(); using var stream = zip.CreateEntry(part).Open(); xml.Save(stream); }
+        var part = $"xl/worksheets/sheet{index + 1}.xml";
+        var xml = Read(part);
+        var cell = xml.Descendants(ns + "c").Single(c => (string?)c.Attribute("r") == XlsxWriter.ColumnName(column) + row);
+        cell.RemoveNodes(); cell.Attribute("s")?.Remove(); cell.Attribute("t")?.Remove();
+        if (percentage)
         {
-            Assert(catalog.RequiredSamples(lower) == count && catalog.RequiredSamples(upper) == count, $"Boundary error at {lower}/{upper}.");
-            Assert(catalog.SamplingRuleFor(lower).AllowedT1Count == t1, "Recovered T1 allowance changed.");
+            var styles = Read("xl/styles.xml"); var xfs = styles.Element(ns + "cellXfs")!;
+            cell.SetAttributeValue("s", xfs.Elements().Count());
+            xfs.Add(new XElement(ns + "xf", new XAttribute("numFmtId", 9), new XAttribute("fontId", 0), new XAttribute("fillId", 0), new XAttribute("borderId", 0), new XAttribute("applyNumberFormat", 1)));
+            xfs.SetAttributeValue("count", xfs.Elements().Count()); Save("xl/styles.xml", styles);
         }
-        Reject(() => catalog.RequiredSamples(100001), "Out-of-range batch accepted.");
-        Reject(() => StandardImporter.ValidateRules([new(1, 20, 0, true), new(10, 40, 5)]), "Overlapping plans accepted.");
-    });
-    var inputPath = Fixture("test-input-kg.xlsx", " kg", 0.091m, 0.089m, 0.090m);
-    var inputHash = DataFiles.Sha256(inputPath);
-    var measurements = MeasurementImporter.Read(inputPath);
-    var batches = new Dictionary<string, string> { ["0011010116"] = "3" };
-    Test("measured import: kg to g, all values retained including below-standard measurements", () =>
+        if (formula is not null) cell.Add(new XElement(ns + "f", formula));
+        if (numeric) { if (value.Length > 0) cell.Add(new XElement(ns + "v", value)); }
+        else { cell.SetAttributeValue("t", "inlineStr"); cell.Add(new XElement(ns + "is", new XElement(ns + "t", value))); }
+        Save(part, xml);
+        return path;
+    }
+    Test("standard import uses the original first-barcode rule and J-column shortage", () =>
     {
-        Assert(measurements.Select(m => m.Grams).SequenceEqual(new decimal[] { 91m, 89m, 90m }), "Measurement altered.");
-        Assert(measurements.All(m => m.Barcode == "0011010116"), "Leading zeros lost.");
-        Assert(measurements[0].SourceRow == 2 && measurements[2].SourceRow == 4, "Source row lost.");
-        Assert(InspectionValidator.Validate(catalog, measurements, batches)[0].AverageGrams == 90m, "Average must include low result.");
+        Assert(catalog.Products.Count == 104 && catalog.Products.Select(p => p.Barcode).Distinct().Count() == 104, "Original duplicate-barcode handling changed.");
+        Assert(catalog.Resolve("0011010178").Barcode == "0011010178", "First duplicate was not retained.");
+        Assert(product.Barcode == "0011010116" && product.FloatingRatioPercent == 110m, "Identifiers or ratio changed.");
+        Assert(catalog.Resolve("4801000353").AllowedShortageGrams == 8.1m, "J-column value replaced by calculated shortage.");
+        Reject(() => catalog.Resolve("UNKNOWN"), "Unknown barcode resolved.");
     });
-    Test("insufficient, unknown, duplicate and invalid data block export", () =>
+    Test("sampling boundaries retain the original 21-31 to 32 behavior", () =>
     {
-        Reject(() => WorkbookExports.Report(Temp("must-not-exist.xlsx"), catalog, measurements,
-            new Dictionary<string, string> { ["0011010116"] = "40" }, DateTime.Today), "Missing measurements must block report.");
-        Assert(!File.Exists(Temp("must-not-exist.xlsx")), "Invalid report was created.");
-        Reject(() => InspectionValidator.Validate(catalog, measurements, new Dictionary<string, string> { ["0011010116"] = "0" }), "Zero batch accepted.");
-        Reject(() => InspectionValidator.Validate(catalog, measurements.Select(m => m with { Barcode = "UNKNOWN" }).ToList(),
-            new Dictionary<string, string> { ["UNKNOWN"] = "3" }), "Unknown barcode accepted.");
-        Reject(() => InspectionValidator.Validate(catalog, [measurements[0], measurements[0], measurements[2]], batches), "Duplicate record accepted.");
-        Reject(() => MeasurementImporter.Read(Fixture("negative.xlsx", "g", -1m)), "Negative weight accepted.");
-        Reject(() => MeasurementImporter.Read(Fixture("bad-unit.xlsx", "???", 91m)), "Unknown unit accepted.");
+        (int Batch, int Count)[] values = [(1,1),(20,20),(21,32),(30,32),(40,32),(41,35),(60,35),(80,47),(100,49),(200,64),(300,67),(400,81),(500,81),(100000,98)];
+        foreach (var (batch,count) in values) Assert(catalog.RequiredSamples(batch) == count, "Sampling boundary changed.");
+        Reject(() => catalog.RequiredSamples(100001), "Unsupported batch accepted.");
     });
-    Test("formula values are rejected rather than trusting cached values", () =>
+    Test("standard batch-size button mapping is restored", () =>
     {
-        var formulaFile = Fixture("formula.xlsx", "g", 91m);
-        using (var zip = ZipFile.Open(formulaFile, ZipArchiveMode.Update))
+        Assert(LegacyInspection.StandardBatchSize(catalog, 3) == 3 && LegacyInspection.StandardBatchSize(catalog, 32) == 40
+            && LegacyInspection.StandardBatchSize(catalog, 98) == 100000 && LegacyInspection.StandardBatchSize(catalog, 33) == 33, "Original button mapping changed.");
+    });
+    Test("floating ratios accept numeric points, Excel percentages, original text and saved formula results", () =>
+    {
+        string[] paths = [RatioWorkbook("ratio-text", "110%"), RatioWorkbook("ratio-fullwidth", "110％"),
+            RatioWorkbook("ratio-number", "110", true), RatioWorkbook("ratio-number-text", "110"),
+            RatioWorkbook("ratio-percentage", "1.1", true, true),
+            RatioWorkbook("ratio-formula", "110", true, false, "RANDBETWEEN(105,115)"),
+            RatioWorkbook("ratio-formula-percentage", "1.1", true, true, "RANDBETWEEN(105,115)/100")];
+        foreach (var path in paths)
         {
-            var entry = zip.GetEntry("xl/worksheets/sheet1.xml")!;
-            XDocument document;
-            using (var stream = entry.Open()) document = XDocument.Load(stream);
-            XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-            document.Descendants(ns + "c").Single(c => (string?)c.Attribute("r") == "E2").AddFirst(new XElement(ns + "f", "90+1"));
-            entry.Delete();
-            using var output = zip.CreateEntry("xl/worksheets/sheet1.xml").Open();
-            document.Save(output);
+            var imported = StandardImporter.Read(path).Resolve(product.Barcode);
+            Assert(imported.FloatingRatioPercent == 110m && Generation.MaximumWeight(imported) == 99m, "Equivalent ratio format changed the maximum: " + path);
         }
-        Reject(() => MeasurementImporter.Read(formulaFile), "Formula accepted as real measurement.");
     });
-    Test("report: summary and per-product detail agree, source rows preserved", () =>
+    Test("ratio formulas require a saved result and other input formulas remain rejected", () =>
     {
-        WorkbookExports.Report(Temp("test-report.xlsx"), catalog, measurements, batches, new(2026, 11, 9));
-        var sheets = XlsxReader.Read(Temp("test-report.xlsx"));
-        Assert(sheets.Count == 3, "Expected summary, detail, metadata sheets.");
-        var summary = sheets[0].Rows.Single(r => r.Number == 3);
-        Assert(summary.At(1) == "0011010116" && summary.At(7) == "3", "Summary identifiers/count changed.");
-        Assert(decimal.Parse(summary.At(8), CultureInfo.InvariantCulture) == 90m, "Summary average changed.");
-        var detail = sheets[1].Rows.Where(r => r.Number >= 3).ToArray();
-        Assert(detail.Length == 3 && detail[1].At(4) == "89", "Low result lost in report.");
-        Assert(detail[1].At(9) == "3" && detail[1].At(10) == measurements[1].RecordId, "Source trace lost.");
+        Reject(() => StandardImporter.Read(RatioWorkbook("ratio-no-cache", "", true, false, "RANDBETWEEN(105,115)")), "Formula without saved calculation accepted.");
+        Reject(() => StandardImporter.Read(RatioWorkbook("ratio-error", "#VALUE!", false, false, "1/0")), "Formula error accepted.");
+        Assert(StandardImporter.Read(RatioWorkbook("ratio-too-low", "99", true)).Resolve(product.Barcode).FloatingRatioPercent is null, "Below-100 ratio accepted.");
+        var rows = new SheetRow(2, new() { [1] = new("90", true, true) });
+        Reject(() => rows.At(1), "Formula restrictions changed outside the ratio importer.");
     });
-    Test("helper export/import round trip preserves measurement values and record identity", () =>
+    Test("80 percent of each product falls in outer quarters with balanced sides and shuffled order", () =>
     {
-        var output = Temp("test-roundtrip.xlsx");
-        WorkbookExports.Measurements(output, catalog, measurements, batches);
-        var again = MeasurementImporter.Read(output);
-        Assert(again.SequenceEqual(measurements), "Helper export changed source records.");
+        foreach (var seed in new[] { 1, 7, 29, 1234 })
+        foreach (var count in new[] { 1, 2, 3, 7, 20, 32, 98, 1000 })
+        {
+            var random = new Random(seed);
+            var weights = new PassWeightGenerator(random.NextDouble).Generate(90m, 99m, count);
+            var low = weights.Count(w => w <= 92.25m); var high = weights.Count(w => w >= 96.75m);
+            Assert(weights.Count == count && weights.All(w => w >= 90m && w <= 99m && w * 10m == decimal.Truncate(w * 10m)), "Weight count, precision or bounds changed.");
+            Assert(low + high == (int)decimal.Round(count * 0.8m, 0, MidpointRounding.AwayFromZero) && Math.Abs(low - high) <= 1, "80/20 quota or side balance failed.");
+            if (count == 1000) Assert(!weights.SequenceEqual(weights.OrderBy(w => w)), "Generated rows were not shuffled.");
+        }
     });
-    Test("legacy judging boundaries, mean condition and record-count mismatch remain visible", () =>
+    Test("one-decimal band boundaries and narrow ranges stay inside requested limits", () =>
     {
-        Assert(RecoveredJudgement.Classify(100m, 5m, 100m) == LegacySampleJudgement.Pass, "Nominal boundary changed.");
-        Assert(RecoveredJudgement.Classify(100m, 5m, 95m) == LegacySampleJudgement.T1, "Shortage boundary changed.");
-        Assert(RecoveredJudgement.Classify(100m, 5m, 94.999m) == LegacySampleJudgement.T2, "T2 boundary changed.");
-        var product = catalog.Resolve("0011010116") with { StandardGrams = 100m, AllowedShortageGrams = 5m };
-        var belowMean = Enumerable.Range(0, 32).Select(i => measurements[0] with { Grams = i == 0 ? 99m : 100m, RecordId = "TEST-MEAN-" + i }).ToList();
-        var metrics = RecoveredJudgement.Evaluate(new(product, 40, 32, belowMean), catalog.SamplingRuleFor(40));
-        Assert(metrics.LegacyCountPass == true && !metrics.AverageMeetsNominal, "Original count result and mean must be separate.");
-        Assert(metrics.ReviewConclusion.Contains("未满足"), "Low mean concealed by count-only pass.");
-        var extra = belowMean.Select(m => m with { Grams = 101m }).Append(measurements[0] with { Grams = 101m, RecordId = "TEST-EXTRA" }).ToList();
-        Assert(RecoveredJudgement.Evaluate(new(product, 40, 32, extra), catalog.SamplingRuleFor(40)).ReviewConclusion.Contains("计划数不同"), "Excess records concealed.");
+        foreach (var next in new Func<double>[] { () => 0, () => double.BitDecrement(1d) })
+        {
+            var weights = new PassWeightGenerator(next).Generate(90.04m, 99.04m, 100);
+            Assert(weights.All(w => w >= 90.04m && w <= 99.04m) && weights.Count(w => w <= 92.29m || w >= 96.79m) == 80, "Rounding moved a sample outside its range or band.");
+        }
+        Assert(new PassWeightGenerator().Generate(90m, 90m, 3).All(w => w == 90m), "Equal limits failed.");
+        Assert(new PassWeightGenerator().Generate(90.04m, 90.16m, 3).All(w => w == 90.1m), "Narrow range failed.");
+        Reject(() => new PassWeightGenerator().Generate(90.01m, 90.09m, 3), "Unrepresentable one-decimal range accepted.");
+        Reject(() => new PassWeightGenerator(() => double.NaN).Generate(90m, 99m, 3), "Invalid random source accepted.");
     });
-    Test("production import: original A/B layout, named code layout, duplicates and unknown identifiers", () =>
+    Test("helper A/B import skips unknown rows and leaves invalid quantities for editing", () =>
     {
-        var legacy = Temp("production-legacy.xlsx");
-        XlsxWriter.Write(legacy, [new("TEST-ONLY", [["0011010116", 3]])]);
-        var entries = ProductionImporter.Read(legacy, catalog);
-        Assert(entries.Single().BatchSize == 3 && entries[0].Barcode == "0011010116", "Original A/B input changed.");
-        var named = Temp("production-named.xlsx");
-        XlsxWriter.Write(named, [new("TEST-ONLY", [["编码", "生产数量", "生产日期"], ["M2", 3, "2026-11-08"]])]);
-        var namedEntry = ProductionImporter.Read(named, catalog).Single();
-        Assert(namedEntry.Barcode == "0011010116" && namedEntry.ProductionDate == "2026-11-08", "Named code input failed.");
-        var duplicated = Temp("production-duplicate.xlsx");
-        XlsxWriter.Write(duplicated, [new("TEST-ONLY", [["0011010116", 3], ["0011010116", 4]])]);
-        Reject(() => ProductionImporter.Read(duplicated, catalog), "Duplicate batches were silently combined.");
-        var unknown = Temp("production-unknown.xlsx");
-        XlsxWriter.Write(unknown, [new("TEST-ONLY", [["UNKNOWN", 3]])]);
-        Reject(() => ProductionImporter.Read(unknown, catalog), "Unknown production row silently skipped.");
-        var zero = Temp("production-zero.xlsx");
-        XlsxWriter.Write(zero, [new("TEST-ONLY", [["0011010116", 0]])]);
-        Reject(() => ProductionImporter.Read(zero, catalog), "Zero production quantity accepted.");
+        var path = Temp("商品表.xlsx");
+        XlsxWriter.Write(path, [new("商品", [["条码", "数量"], [product.Barcode, 3], ["UNKNOWN", 99], [product.Barcode, ""], [product.Barcode, "not-a-number"]])]);
+        var rows = ProductionImporter.Read(path, catalog);
+        Assert(rows.Count == 3 && rows.Select(r => r.BatchSize).SequenceEqual(new[] { 3, 0, 0 }), "Legacy helper import behavior changed.");
     });
-    Test("preferences: updates preserve other app fields, damaged JSON backed up", () =>
+    Test("helper maximum follows floating ratio or manual override", () =>
     {
-        var path = Temp("preferences.json"); var store = new UserFolderPreferenceStore(path);
-        store.Update(old => old with { MainStandardWorkbookPath = standard });
-        new UserFolderPreferenceStore(path).Update(old => old with { HelperEntryWorkbookDirectory = temporary });
-        Assert(store.Load().MainStandardWorkbookPath == standard && store.Load().HelperEntryWorkbookDirectory == temporary, "Other app preferences overwritten.");
-        File.WriteAllText(path, "{broken");
-        store.Load(); Assert(store.LoadWarning is not null, "Corrupt preference warning missing.");
-        store.Update(old => old with { MainOutputDirectory = temporary });
-        Assert(Directory.GetFiles(temporary, "preferences.json.corrupt-*").Length == 1, "Corrupt settings not backed up.");
-        Assert(UserFolderPreferenceStore.GetExistingFile(Temp("nonexistent.xlsx")) is null, "Missing file restored.");
+        Assert(Generation.MaximumWeight(product) == 99m && Generation.MaximumWeight(product, 92m) == 92m, "Maximum rule changed.");
+        Reject(() => Generation.MaximumWeight(product, 89m), "Below-standard maximum accepted.");
+        Reject(() => Generation.MaximumWeight(product with { FloatingRatioPercent = null }), "Missing ratio defaulted.");
     });
-    Test("template report: styles retained, historical results cleared, all records paginated", () =>
+    Test("helper generation accepts original small batches and retains date/time behavior", () =>
     {
-        var template = Path.Combine(AppContext.BaseDirectory, "SharedContent", "ReportTemplates", "MRO-ReportTemplate.xlsx");
-        var output = Temp("test-template-report.xlsx");
-        var full = Enumerable.Range(0, 101).Select(i => measurements[0] with { Grams = 90m, SourceRow = i + 2, RecordId = "TEST-PAGE-" + i }).ToList();
-        WorkbookExports.Report(output, catalog, full, new Dictionary<string, string> { ["0011010116"] = "1000" }, new(2026,11,9), template);
-        var sheets = XlsxReader.Read(output);
-        Assert(sheets.Count == 5, "Expected summary, two detail pages, trace and notes.");
-        Assert(sheets[0].Rows.Single(r => r.Number == 7).At(3) == "迷你毛毛虫（面包）", "Summary mapped to wrong cell.");
-        Assert(sheets[1].Rows.Single(r => r.Number == 3).At(1).StartsWith("样品1."), "First detail sample misplaced.");
-        Assert(sheets[2].Rows.Single(r => r.Number == 3).At(1).StartsWith("样品101."), "Samples beyond 100 lost.");
-        Assert(sheets[3].Rows.Count(r => r.Number >= 3) == 101, "Trace does not contain all measurements.");
-        Assert(sheets[0].Rows.Single(r => r.Number == 7).At(9) == "未录入", "Sensory result fabricated.");
-        Assert(sheets[1].Rows.Single(r => r.Number == 33).At(3) == "未提供", "Production date fabricated.");
-        Assert(sheets.SelectMany(s => s.Rows).All(r => r.Cells.Values.All(c => !c.Text.Contains("66.1g"))), "Historical result leaked.");
-        Assert(TemplateReportExporter.DetailSlot(1) == "A3" && TemplateReportExporter.DetailSlot(26) == "C3" && TemplateReportExporter.DetailSlot(100) == "G27", "Original sample layout changed.");
-        using var original = ZipFile.OpenRead(template); using var exported = ZipFile.OpenRead(output);
-        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        XElement Load(ZipArchive archive, string name) { using var stream = archive.GetEntry(name)!.Open(); return XElement.Load(stream); }
-        Assert(XNode.DeepEquals(Load(original, "xl/worksheets/sheet2.xml").Element(ns+"mergeCells"), Load(exported, "xl/worksheets/sheet2.xml").Element(ns+"mergeCells")), "Detail merges changed.");
-        Assert(XNode.DeepEquals(Load(original, "xl/worksheets/sheet2.xml").Element(ns+"pageMargins"), Load(exported, "xl/worksheets/sheet2.xml").Element(ns+"pageMargins")), "Detail margins changed.");
-        Assert(!exported.Entries.Any(e => e.FullName.Contains("externalLink")), "Historical external link retained.");
+        var entry = new ProductionEntry(product.Barcode, 30, "", "", "TEST-ONLY", "", 0, MaximumWeightGrams: 92m);
+        var generated = Generation.Build(catalog, [entry], new(2026,11,9,23,59,59), new PassWeightGenerator(() => 0.5));
+        Assert(generated.Count == 32 && generated.All(m => m.Grams >= 90m && m.Grams <= 92m), "Legacy generation count or cap changed.");
+        Assert(generated[1].Date == "2026.11.09" && generated[1].Time == "00:00:00", "Original fixed-date sequence changed.");
+        Assert(Generation.Build(catalog, [entry with { BatchSize = 1 }, entry with { BatchSize = 1 }], DateTime.Today).Count == 2, "Repeated helper rows were blocked.");
     });
-    Test("literal text is not exported as formula, existing files and originals never overwritten", () =>
+    Test("helper exports only one workbook with the original eight columns", () =>
     {
-        var literal = Temp("literal.xlsx");
-        XlsxWriter.Write(literal, [new("文本", [["=1+1"]])]);
-        Assert(XlsxReader.Read(literal)[0].Rows[0].At(1) == "=1+1", "Text interpreted as formula.");
-        Reject(() => XlsxWriter.Write(inputPath, [new("x", [["overwrite"]])]), "Input overwritten.");
-        Assert(DataFiles.Sha256(inputPath) == inputHash, "Input file changed.");
+        var directory = Path.Combine(temporary, "helper");
+        var exported = Generation.Export(Path.Combine(directory, "W261109.xlsx"), catalog,
+            [new(product.Barcode, 3, "", "", "TEST-ONLY", "", 0)], new(2026,11,9,12,0,0));
+        Assert(Directory.GetFiles(directory, "*.xlsx").Length == 1 && exported.Count == 3, "Helper exported additional reports.");
+        var sheet = XlsxReader.Read(exported.WeighingPath).Single();
+        Assert(Enumerable.Range(1,8).Select(i => sheet.Rows[0].At(i)).SequenceEqual(new[] { "序号","日期","时间","皮重","重量","毛重","单位","扫描" }), "Eight-column header changed.");
+        Assert(sheet.Rows.All(r => r.Cells.Keys.All(c => c <= 8)) && sheet.Name.StartsWith("W"), "Added visible metadata columns or source labels.");
+        Assert(MeasurementImporter.Read(exported.WeighingPath).Count == 3, "Generated workbook cannot be imported by main.");
+        Assert(XNode.DeepEquals(Xml(Content("WeighingTemplate.xlsx"),"xl/worksheets/sheet1.xml").Element(ns+"cols"), Xml(exported.WeighingPath,"xl/worksheets/sheet1.xml").Element(ns+"cols")), "Original weighing widths changed.");
     });
-    Console.WriteLine($"All {passed} checks passed. Test files are marked TEST-ONLY and will be deleted.");
-    Directory.Delete(temporary, true);
+    Test("weighing round trip preserves eight-column values without added metadata", () =>
+    {
+        var path = Temp("称重.xlsx"); WorkbookExports.Measurements(path, catalog, measurements, Batches(3));
+        var read = MeasurementImporter.Read(path);
+        Assert(read.Select(m => m.Grams).SequenceEqual(measurements.Select(m => m.Grams)) && read.All(m => m.Barcode == product.Barcode), "Weights or barcode changed.");
+        using var zip = ZipFile.OpenRead(path);
+        Assert(!zip.Entries.Any(e => e.FullName.Contains("customXml")), "Unrequested hidden data part added.");
+    });
+    Test("original supplementation retains existing samples and uses six-draw centered weights", () =>
+    {
+        var adjusted = LegacyInspection.Prepare(catalog, measurements, Batches(40), () => 0.5).Single();
+        Assert(adjusted.Measurements.Count == 32 && adjusted.Measurements.Take(3).SequenceEqual(measurements), "Supplement changed original records.");
+        Assert(adjusted.Measurements.Skip(3).All(m => m.Grams == 90.5m), "Legacy supplementation range changed.");
+        Assert(measurements.Count == 3, "Input list mutated.");
+    });
+    Test("original overflow trimming removes Pass then T1 then T2 from the end", () =>
+    {
+        var raw = Records(91m,89m,82m,92m,93m);
+        var adjusted = LegacyInspection.Prepare(catalog, raw, Batches(3)).Single();
+        Assert(adjusted.Measurements.Select(m => m.Grams).SequenceEqual(new[] { 91m,89m,82m }) && raw.Count == 5, "Legacy trimming order changed.");
+    });
+    Test("legacy count conclusion does not add an average-weight gate", () =>
+    {
+        var custom = catalog with { Products = [product with { StandardGrams = 100m, AllowedShortageGrams = 5m }] };
+        var raw = Records(Enumerable.Repeat(100m,31).Append(99m).ToArray());
+        var metrics = RecoveredJudgement.Evaluate(LegacyInspection.Prepare(custom, raw, Batches(40)).Single(), custom.SamplingRuleFor(40));
+        Assert(metrics.LegacyCountPass == true && !metrics.AverageMeetsNominal, "Count-only legacy conclusion changed.");
+        var report = WorkbookExports.Report(Temp("旧判定.xlsx"), custom, raw, Batches(40), new(2026,11,9), reportTemplate);
+        Assert(XlsxReader.Read(report.SummaryPath).Single().Rows.Single(r => r.Number == 7).At(15) == "符合规定", "Added judgement text or mean gate in report.");
+    });
+    Test("reports have only original template sheets and original report wording", () =>
+    {
+        var generated = measurements.Select(m => m with { DataOrigin = "规则生成" }).ToList();
+        var result = WorkbookExports.Report(Temp("输出.xlsx"), catalog, generated, Batches(3), new(2026,11,9), reportTemplate);
+        var summary = XlsxReader.Read(result.SummaryPath).Single(); var detail = XlsxReader.Read(result.DetailPaths.Single()).Single();
+        Assert(summary.Rows.Single(r => r.Number == 2).At(1) == "产品检测报告", "Added summary title marker.");
+        Assert(detail.Rows.Single(r => r.Number == 1).At(1) == XlsxReader.Read(detailTemplate).Single().Rows.Single(r => r.Number == 1).At(1), "Detail title differs from original template.");
+        var row = summary.Rows.Single(r => r.Number == 7);
+        Assert(row.At(9) == "正常" && row.At(15) == "不合格", "Original default sensory or conclusion wording changed.");
+        Assert(row.At(14) == product.InspectionBasis && summary.Rows.Single(r => r.Number == 4).At(14) == "检验依据", "Original template basis column changed.");
+        var values = summary.Rows.Concat(detail.Rows).SelectMany(r => r.Cells.Values).Select(c => c.Text).ToArray();
+        Assert(values.All(v => !new[] { "规则生成", "待复核", "未录入", "未提供", "旧版口径", "测量追溯", "报告说明" }.Any(v.Contains)), "Unrequested report marker remains.");
+        Assert(detail.Rows.Single(r => r.Number == 35).At(3) == product.Code + "20261109", "Added record-number suffix.");
+        Assert(detail.Rows.Single(r => r.Number == 33).At(3) == "2026年11月09日", "Original production-date default changed.");
+    });
+    Test("report geometry, merges and page setup come from the original workbooks", () =>
+    {
+        var result = WorkbookExports.Report(Temp("版式.xlsx"), catalog, measurements, Batches(3), new(2026,11,9), reportTemplate);
+        foreach (var (source, target) in new[] { (reportTemplate,result.SummaryPath),(detailTemplate,result.DetailPaths.Single()) })
+        {
+            var before = Xml(source,"xl/worksheets/sheet1.xml"); var after = Xml(target,"xl/worksheets/sheet1.xml");
+            foreach (var part in new[] { "cols","mergeCells","pageMargins","pageSetup" })
+                Assert(XNode.DeepEquals(before.Element(ns+part),after.Element(ns+part)), "Original layout changed: " + part);
+            Assert(before.Element(ns+"sheetData")!.Elements(ns+"row").Select(r=>string.Join("|",r.Attributes())).SequenceEqual(
+                after.Element(ns+"sheetData")!.Elements(ns+"row").Select(r=>string.Join("|",r.Attributes()))), "Original row geometry changed.");
+            using var zip = ZipFile.OpenRead(target);
+            Assert(!zip.Entries.Any(e => e.FullName.Contains("externalLink")), "Historical broken external link retained.");
+        }
+    });
+    Test("separate product files and summary retain original filename suffixes", () =>
+    {
+        var second = catalog.Products.First(p => p.Barcode != product.Barcode);
+        var raw = measurements.Concat(new[] { measurements[0] with { Barcode = second.Barcode, RecordId = "SECOND" } }).ToList();
+        var batches = Batches(3); batches.Add(second.Barcode,"1");
+        var report = WorkbookExports.Report(Temp("分文件.xlsx"), catalog, raw, batches, new(2026,11,9), reportTemplate);
+        Assert(report.DetailPaths.Count == 2 && Path.GetFileName(report.SummaryPath) == "分文件_批次检测报告结果.xlsx", "Separate filenames changed.");
+        foreach (var path in report.DetailPaths) Assert(path.EndsWith("_批次检测报告.xlsx") && XlsxReader.Read(path).Count == 1, "Product report is not independent.");
+        Assert(!File.Exists(Temp("分文件.xlsx")), "Combined workbook still exported.");
+    });
+    Test("natural product-code sorting and 15-row summary pagination match legacy behavior", () =>
+    {
+        Assert(new[] { "M10","M2","M1","Z2" }.OrderBy(c=>c,ProductCodeComparer.Instance).SequenceEqual(new[] { "M1","M2","M10","Z2" }), "Natural code sorting changed.");
+        var products = catalog.Products.Take(16).ToList();
+        var raw = products.Select((p,i)=>measurements[0] with { Barcode=p.Barcode, RecordId="PAGE-"+i }).ToList();
+        var batches = products.ToDictionary(p=>p.Barcode,p=>"1");
+        var report = WorkbookExports.Report(Temp("分页.xlsx"),catalog,raw,batches,new(2026,11,9),reportTemplate);
+        var sheets = XlsxReader.Read(report.SummaryPath);
+        Assert(sheets.Count==2 && report.DetailPaths.Count==16, "Unrequested pages or missing summary pagination.");
+        var sorted=products.OrderBy(p=>p.Code,ProductCodeComparer.Instance).ToArray();
+        Assert(sheets[0].Rows.Single(r=>r.Number==21).At(2)==sorted[14].Code && sheets[1].Rows.Single(r=>r.Number==7).At(2)==sorted[15].Code, "Pagination dropped or reordered products.");
+    });
+    Test("existing outputs are replaced as in the original program", () =>
+    {
+        var result=WorkbookExports.Report(Temp("覆盖.xlsx"),catalog,measurements,Batches(3),new(2026,11,9),reportTemplate);
+        File.WriteAllText(result.SummaryPath,"OLD-CUSTOMER-FILE");
+        WorkbookExports.Report(Temp("覆盖.xlsx"),catalog,Records(91m,91m,91m),Batches(3),new(2026,11,9),reportTemplate);
+        Assert(XlsxReader.Read(result.SummaryPath).Single().Rows.Single(r=>r.Number==7).At(15)=="符合规定", "Legacy replacement failed.");
+        var hash=DataFiles.Sha256(result.SummaryPath);
+        Reject(()=>WorkbookExports.Report(Temp("覆盖.xlsx"),catalog,measurements,Batches(3),new(2026,11,9),Temp("missing.xlsx")),"Missing template accepted.");
+        Assert(DataFiles.Sha256(result.SummaryPath)==hash && !Directory.GetDirectories(temporary,".mro-*").Any(),"Failed export damaged prior outputs.");
+    });
+    Test("input and source templates stay unchanged", () =>
+    {
+        Assert(DataFiles.Sha256(standard)==originalHash,"Original standard file changed.");
+        Reject(()=>InspectionValidator.Validate(catalog,measurements,new Dictionary<string,string>{{product.Barcode,"0"}}),"Zero quantity accepted.");
+        Reject(()=>InspectionValidator.Validate(catalog,[measurements[0],measurements[0]],Batches(2)),"Duplicate record ID accepted.");
+    });
+    Console.WriteLine($"All {passed} checks passed.");
+    if(args.Contains("--keep-fixtures")) Console.WriteLine("TEST-ONLY fixtures: "+temporary);
+    else Directory.Delete(temporary,true);
     return 0;
 }
-catch (Exception ex)
+catch(Exception ex)
 {
-    Console.Error.WriteLine($"FAILED after {passed} checks. {ex}\nDiagnostic fixtures (TEST-ONLY): {temporary}");
-    return 1;
+    Console.Error.WriteLine($"FAILED after {passed} checks. {ex}\nFixtures: {temporary}");return 1;
 }

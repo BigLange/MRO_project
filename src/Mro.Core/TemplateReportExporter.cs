@@ -4,7 +4,7 @@ using System.Xml.Linq;
 
 namespace Mro.Core;
 
-/// <summary>Fill the empty recovered template; never copy historical result values.</summary>
+/// <summary>Fill the original report forms without adding report text, columns or worksheets.</summary>
 public static class TemplateReportExporter
 {
     private static readonly XNamespace S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -12,122 +12,127 @@ public static class TemplateReportExporter
     private static readonly XNamespace P = "http://schemas.openxmlformats.org/package/2006/relationships";
     private static readonly XNamespace C = "http://schemas.openxmlformats.org/package/2006/content-types";
     private sealed record Page(string Name, XElement Sheet, string? PrintArea = null);
+    private sealed record Template(XElement Sheet, XElement Styles, XElement Theme);
 
-    public static void Write(string path, string templatePath, StandardCatalog catalog,
+    private static Template Load(string path)
+    {
+        using var zip = ZipFile.OpenRead(path);
+        XElement Read(string name) { using var stream = (zip.GetEntry(name) ?? throw new InvalidDataException("模板缺少 " + name)).Open(); return XElement.Load(stream); }
+        var sheet = Read("xl/worksheets/sheet1.xml");
+        var strings = zip.GetEntry("xl/sharedStrings.xml") is null ? [] : Read("xl/sharedStrings.xml").Elements(S + "si").ToArray();
+        foreach (var cell in sheet.Descendants(S + "c").Where(c => (string?)c.Attribute("t") == "s"))
+        {
+            var index = int.Parse(cell.Element(S + "v")!.Value, CultureInfo.InvariantCulture);
+            cell.RemoveNodes(); cell.SetAttributeValue("t", "inlineStr");
+            cell.Add(new XElement(S + "is", strings[index].Nodes().Select(n => n is XElement e ? new XElement(e) : n)));
+        }
+        return new(sheet, Read("xl/styles.xml"), Read("xl/theme/theme1.xml"));
+    }
+
+    private static string ReferenceFolder(string? templatePath)
+    {
+        if (templatePath is null) return Path.Combine(AppContext.BaseDirectory, "SharedContent", "ReferenceReports");
+        if (!File.Exists(templatePath)) throw new FileNotFoundException("报告模板不存在。", templatePath);
+        var directory = Path.GetDirectoryName(Path.GetFullPath(templatePath))!;
+        return Path.GetFileName(templatePath) == "MRO-ReportTemplate.xlsx" ? Path.Combine(directory, "..", "ReferenceReports") : directory;
+    }
+
+    public static ReportExportResult Write(string path, string? templatePath, StandardCatalog catalog,
         IReadOnlyList<Measurement> measurements, IReadOnlyDictionary<string, string> batchSizes,
         DateTime reportDate, IReadOnlyList<ProductionEntry>? production = null)
     {
-        var groups = InspectionValidator.Validate(catalog, measurements, batchSizes);
-        if (production is not null && production.Any(p => !batchSizes.ContainsKey(p.Barcode)))
-            throw new InvalidDataException("生产表中还有未纳入报告的产品，不能省略缺测产品。");
-        using var template = ZipFile.OpenRead(templatePath);
-        XElement Xml(string entry)
-        {
-            using var stream = (template.GetEntry(entry) ?? throw new InvalidDataException("模板缺少 " + entry)).Open();
-            return XElement.Load(stream);
-        }
-        var summary = Xml("xl/worksheets/sheet1.xml");
-        var detail = Xml("xl/worksheets/sheet2.xml");
-        var trace = Xml("xl/worksheets/sheet3.xml");
-        var notes = Xml("xl/worksheets/sheet4.xml");
-        if (new[] { summary, detail, trace, notes }.Any(s => s.Descendants(S + "f").Any()))
-            throw new InvalidDataException("空白报告模板不能含计算或历史结果公式。");
-        var styles = Xml("xl/styles.xml");
-        var pages = new List<Page>();
+        var groups = LegacyInspection.Prepare(catalog, measurements, batchSizes);
+        var folder = ReferenceFolder(templatePath);
+        var summary = Load(Path.Combine(folder, "检测报告2.xlsx"));
+        var detail = Load(Path.Combine(folder, "检测报告1.xlsx"));
+        var result = ReportFileNames.Create(path, groups);
+        var summaryPages = new List<Page>();
+        var outputs = new List<PendingWorkbook>();
         var redStyles = new Dictionary<string, string>();
         var metrics = groups.Select(g => RecoveredJudgement.Evaluate(g, catalog.SamplingRuleFor(g.BatchSize))).ToArray();
-        var productionByBarcode = (production ?? []).ToDictionary(e => e.Barcode);
+        var date = reportDate.ToString("yyyy年MM月dd日", CultureInfo.InvariantCulture);
+        var stamp = DateTime.Now.ToString("HHmmss", CultureInfo.InvariantCulture);
         for (var pageIndex = 0; pageIndex * 15 < groups.Count; pageIndex++)
         {
-            var sheet = new XElement(summary);
+            var sheet = new XElement(summary.Sheet);
+            foreach (var cell in sheet.Descendants(S + "c").Where(c => RowNumber(c) is >= 7 and <= 21)) Clear(cell);
+            SetCell(sheet, "C3", date); SetCell(sheet, "G3", date); SetCell(sheet, "K3", date);
             var pageGroups = groups.Skip(pageIndex * 15).Take(15).ToArray();
-            var dates = pageGroups.Select(g => productionByBarcode.GetValueOrDefault(g.Product.Barcode)?.ProductionDate ?? "")
-                .Where(d => d.Length > 0).Distinct().ToArray();
-            var samplingDates = pageGroups.SelectMany(g => g.Measurements).Select(m => m.Date).Where(d => d.Length > 0).Distinct().ToArray();
-            SetCell(sheet, "C3", samplingDates.Length == 1 ? samplingDates[0] : "见测量追溯");
-            SetCell(sheet, "G3", dates.Length == 1 && pageGroups.All(g => !string.IsNullOrEmpty(productionByBarcode.GetValueOrDefault(g.Product.Barcode)?.ProductionDate)) ? dates[0] : "见生产表/未提供");
-            SetCell(sheet, "K3", reportDate.ToString("yyyy年MM月dd日", CultureInfo.InvariantCulture));
             for (var j = 0; j < pageGroups.Length; j++)
             {
                 var group = pageGroups[j]; var m = metrics[pageIndex * 15 + j]; var row = 7 + j;
                 object?[] values = [pageIndex * 15 + j + 1, group.Product.Code, group.Product.ProductName,
-                    group.Product.Category, group.Product.StandardGrams.ToString("0.0", CultureInfo.InvariantCulture),
-                    group.BatchSize, CountText(group), group.Product.SensoryRequirement, "未录入",
-                    group.Product.Requirement, $"T1：{m.AllowedT1Count}，T2：{m.AllowedT2Count}",
-                    m.AverageGrams.ToString("0.##", CultureInfo.InvariantCulture) + "g",
-                    m.LegacyCountPass is null ? "缺少短缺量" : $"T1：{m.T1Count}，T2：{m.T2Count}", m.ReviewConclusion];
+                    group.Product.Category, group.Product.StandardGrams, group.BatchSize, group.RequiredSamples,
+                    group.Product.SensoryRequirement, "正常", group.Product.Requirement,
+                    $"T1：{m.AllowedT1Count}，T2：{m.AllowedT2Count}",
+                    LegacyInspection.Average(group).ToString("0.##", CultureInfo.InvariantCulture) + "g",
+                    $"T1：{m.T1Count}，T2：{m.T2Count}", group.Product.InspectionBasis,
+                    m.LegacyCountPass == true ? "符合规定" : "不合格"];
                 for (var column = 0; column < values.Length; column++) SetCell(sheet, XlsxWriter.ColumnName(column + 1) + row, values[column]);
             }
-            pages.Add(new($"汇总{pageIndex + 1:000}", sheet, "$A$1:$N$23"));
+            summaryPages.Add(new(SheetName("批次检测报告结果" + (groups.Count > 15 ? (pageIndex + 1).ToString() : "") + "_" + stamp), sheet, "$A$1:$O$23"));
         }
-        var traceRows = new List<object?[]>();
         for (var i = 0; i < groups.Count; i++)
         {
             var group = groups[i]; var m = metrics[i];
-            for (var offset = 0; offset < group.Measurements.Count; offset += 100)
-            {
-                var sheet = new XElement(detail);
-                SetCell(sheet, "C2", group.Product.ProductName);
-                SetCell(sheet, "G2", group.Product.StandardGrams.ToString("0.0", CultureInfo.InvariantCulture) + " g");
-                for (var j = 0; j < Math.Min(100, group.Measurements.Count - offset); j++)
-                {
-                    var measurement = group.Measurements[offset + j];
-                    var cell = SetCell(sheet, DetailSlot(j + 1), $"样品{offset + j + 1}. {measurement.Grams.ToString("0.0", CultureInfo.InvariantCulture)} g");
-                    if (group.Product.AllowedShortageGrams is decimal shortage && RecoveredJudgement.Classify(group.Product.StandardGrams, shortage, measurement.Grams) != LegacySampleJudgement.Pass)
-                        cell.SetAttributeValue("s", RedStyle((string?)cell.Attribute("s") ?? "0", styles, redStyles));
-                }
-                SetCell(sheet, "C28", m.AverageGrams.ToString("0.0", CultureInfo.InvariantCulture) + " g");
-                SetCell(sheet, "G28", group.Product.AllowedShortageGrams is decimal allowed ? allowed.ToString("0.0", CultureInfo.InvariantCulture) + " g" : "未提供");
-                SetCell(sheet, "C29", m.LegacyCountPass is null ? "待复核" : m.T1Count.ToString());
-                SetCell(sheet, "G29", m.LegacyCountPass is null ? "待复核" : m.T2Count.ToString());
-                SetCell(sheet, "C31", group.Product.Barcode); SetCell(sheet, "G31", group.Product.SourceLocation);
-                SetCell(sheet, "C32", reportDate.ToString("yyyy年MM月dd日", CultureInfo.InvariantCulture));
-                SetCell(sheet, "G32", group.BatchSize + " 袋");
-                SetCell(sheet, "C33", productionByBarcode.GetValueOrDefault(group.Product.Barcode)?.ProductionDate is { Length: > 0 } date ? date : "未提供");
-                SetCell(sheet, "G33", group.Product.Category); SetCell(sheet, "C34", group.Product.Code);
-                SetCell(sheet, "G34", CountText(group) + " 袋");
-                SetCell(sheet, "C35", group.Product.Code + reportDate.ToString("yyyyMMdd") + $"-{offset / 100 + 1}");
-                SetCell(sheet, "G35", group.Product.InspectionBasis);
-                pages.Add(new($"明细{i + 1:000}_{offset / 100 + 1:00}", sheet, "$A$1:$H$35"));
-            }
+            var sheet = new XElement(detail.Sheet);
+            for (var j = 1; j <= 100; j++) SetCell(sheet, DetailSlot(j), "");
+            SetCell(sheet, "C2", group.Product.ProductName);
+            SetCell(sheet, "G2", group.Product.StandardGrams.ToString("0.0", CultureInfo.InvariantCulture) + " g");
             for (var j = 0; j < group.Measurements.Count; j++)
             {
                 var measurement = group.Measurements[j];
-                traceRows.Add([group.Product.Barcode, group.Product.Code, group.Product.ProductName, j + 1, measurement.Grams,
-                    group.Product.AllowedShortageGrams is decimal shortage ? RecoveredJudgement.Classify(group.Product.StandardGrams, shortage, measurement.Grams).ToString() : "未判定",
-                    measurement.SourceFile, measurement.SourceSheet, measurement.SourceRow, measurement.RecordId]);
+                var cell = SetCell(sheet, DetailSlot(j + 1), $"样品{j + 1}. {measurement.Grams.ToString("0.0", CultureInfo.InvariantCulture)} g");
+                if (RecoveredJudgement.Classify(group.Product.StandardGrams, group.Product.AllowedShortageGrams!.Value, measurement.Grams) != LegacySampleJudgement.Pass)
+                    cell.SetAttributeValue("s", RedStyle((string?)cell.Attribute("s") ?? "0", detail.Styles, redStyles));
             }
+            SetCell(sheet, "C28", LegacyInspection.Average(group).ToString("0.0", CultureInfo.InvariantCulture) + " g");
+            SetCell(sheet, "G28", group.Product.AllowedShortageGrams!.Value.ToString("0.0", CultureInfo.InvariantCulture) + " g");
+            SetCell(sheet, "C29", m.T1Count); SetCell(sheet, "G29", m.T2Count);
+            SetCell(sheet, "C31", group.Product.Barcode); SetCell(sheet, "G31", group.Product.SourceLocation);
+            SetCell(sheet, "C32", date); SetCell(sheet, "G32", group.BatchSize + " 袋");
+            SetCell(sheet, "C33", date); SetCell(sheet, "G33", group.Product.Category);
+            SetCell(sheet, "C34", group.Product.Code); SetCell(sheet, "G34", group.RequiredSamples + " 袋");
+            SetCell(sheet, "C35", group.Product.Code + reportDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture));
+            SetCell(sheet, "G35", group.Product.InspectionBasis);
+            var page = new Page(SheetName(group.Product.ProductName + " 批次检测报告_" + stamp), sheet, "$A$1:$H$35");
+            outputs.Add(new(result.DetailPaths[i], target => WritePackage(target, [page], detail.Styles, detail.Theme)));
         }
-        FillRows(trace, traceRows);
-        pages.Add(new("测量追溯", trace));
-        var noteRows = new List<object?[]> {
-            ["报告范围", "按原程序口径计算的实测统计；法规未独立核验，感官结果未录入，不自动出具总体合格证明。"],
-            ["标准来源", catalog.SourceFile], ["标准SHA-256", catalog.SourceSha256],
-            ["模板SHA-256", DataFiles.Sha256(templatePath)],
-            ["T1/T2口径", "旧版：实测≥规格为Pass；规格-短缺量≤实测<规格为T1；低于规格-短缺量为T2。不是已核实的法规定义。"],
-            ["旧版批次口径", "原函数只检查T1数量及是否有T2；本版额外显示平均值和数量偏差，不能把计数通过当作完整法规合格。"],
-            ["短缺量来源", "读取标准表J列；H列文字与J列可能冲突，需审核。"],
-            ["测量范围", "所有导入记录均保留；不截取、补值或改变不利记录。"],
-            ["显示精度", "表单按旧版显示1或2位小数；测量追溯页保留原始精度。"],
-            ["分页", "汇总每页15个产品，明细每页100条；统计按该产品全部记录计算。"],
-            ["来源字段", "仅用于回查输入，不代表经过仪器签名认证。"],
-            ["生产数量来源", production is { Count: > 0 } ? "已导入生产表；下方逐条列出来源与是否被手工改动。" : "界面手工输入"]
-        };
-        for (var i = 0; i < groups.Count; i++)
-        {
-            var g = groups[i]; var m = metrics[i];
-            noteRows.Add([$"{g.Product.Barcode} 精确平均值", m.AverageGrams]);
-            noteRows.Add([$"{g.Product.Barcode} 平均值达到规格", m.AverageMeetsNominal ? "是" : "否"]);
-            noteRows.Add([$"{g.Product.Barcode} 原版计数函数", m.LegacyCountPass is null ? "无法判定" : m.LegacyCountPass.Value ? "计数通过（不等于法规合格）" : "计数不通过"]);
-            if (productionByBarcode.TryGetValue(g.Product.Barcode, out var entry))
-                noteRows.Add([$"{g.Product.Barcode} 生产表来源", $"{entry.SourceFile} | {entry.SourceSheet}:{entry.SourceRow} | 原数量{entry.BatchSize}，当前数量{g.BatchSize}"]);
-        }
-        FillRows(notes, noteRows); pages.Add(new("报告说明", notes));
-        WritePackage(path, pages, styles, Xml("xl/theme/theme1.xml"));
+        outputs.Add(new(result.SummaryPath, target => WritePackage(target, summaryPages, summary.Styles, summary.Theme)));
+        WorkbookExportSet.Write(outputs.GroupBy(o => o.Path, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList());
+        return result;
     }
 
-    private static string CountText(InspectionGroup group) => group.Measurements.Count == group.RequiredSamples
-        ? group.RequiredSamples.ToString() : $"实测{group.Measurements.Count}/应{group.RequiredSamples}";
+    internal static void WriteWeighing(string path, IReadOnlyList<Measurement> measurements)
+    {
+        if (measurements.Count == 0) throw new InvalidDataException("没有称重记录。");
+        var template = Load(Path.Combine(AppContext.BaseDirectory, "SharedContent", "WeighingTemplate.xlsx"));
+        var sheet = template.Sheet;
+        var data = sheet.Element(S + "sheetData")!;
+        var prototype = new XElement(data.Elements(S + "row").First(r => (int?)r.Attribute("r") == 2));
+        data.Elements(S + "row").Where(r => (int?)r.Attribute("r") >= 2).Remove();
+        for (var i = 0; i < Math.Max(6, measurements.Count); i++)
+        {
+            var row = new XElement(prototype); row.SetAttributeValue("r", i + 2);
+            foreach (var cell in row.Elements(S + "c"))
+            {
+                cell.SetAttributeValue("r", new string(((string)cell.Attribute("r")!).TakeWhile(char.IsAsciiLetter).ToArray()) + (i + 2)); Clear(cell);
+            }
+            data.Add(row);
+            if (i >= measurements.Count) continue;
+            var m = measurements[i];
+            object?[] values = [(i + 1).ToString("D5"), m.Date, m.Time, m.TareGrams ?? 0m,
+                m.Grams.ToString("0.0", CultureInfo.InvariantCulture), (m.GrossGrams ?? m.Grams).ToString("0.0", CultureInfo.InvariantCulture), "g", m.Barcode];
+            for (var c = 0; c < values.Length; c++) SetCell(sheet, XlsxWriter.ColumnName(c + 1) + (i + 2), values[c]);
+        }
+        sheet.Element(S + "dimension")?.SetAttributeValue("ref", "A1:H" + Math.Max(7, measurements.Count + 1));
+        WorkbookExportSet.Write([new(path, target => WritePackage(target,
+            [new("W" + DateTime.Now.ToString("yyMMdd", CultureInfo.InvariantCulture), sheet)], template.Styles, template.Theme))]);
+    }
+
+    private static void Clear(XElement cell) { cell.RemoveNodes(); cell.Attribute("t")?.Remove(); }
+    private static int RowNumber(XElement cell) => int.Parse(new string(((string)cell.Attribute("r")!).Where(char.IsAsciiDigit).ToArray()), CultureInfo.InvariantCulture);
+    private static string SheetName(string value) => new string(value.Select(c => "[]:*?/\\".Contains(c) ? '_' : c).ToArray())[..Math.Min(31, value.Length)];
     public static string DetailSlot(int oneBasedIndex)
     {
         if (oneBasedIndex is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(oneBasedIndex));
@@ -141,30 +146,25 @@ public static class TemplateReportExporter
         var row = data.Elements(S + "row").FirstOrDefault(r => (int?)r.Attribute("r") == number);
         if (row is null) { row = new XElement(S + "row", new XAttribute("r", number)); data.Add(row); }
         var cell = row.Elements(S + "c").FirstOrDefault(c => (string?)c.Attribute("r") == reference);
-        if (cell is null) { cell = new XElement(S + "c", new XAttribute("r", reference)); row.Add(cell); }
+        if (cell is null)
+        {
+            cell = new XElement(S + "c", new XAttribute("r", reference));
+            if (row.Elements(S + "c").LastOrDefault()?.Attribute("s") is XAttribute style) cell.SetAttributeValue("s", style.Value);
+            row.Add(cell);
+            var sorted = row.Elements(S + "c").OrderBy(c => ColumnIndex((string)c.Attribute("r")!)).ToArray();
+            row.RemoveNodes(); row.Add(sorted);
+        }
         cell.RemoveNodes(); cell.Attribute("t")?.Remove();
         if (value is decimal or int or long) cell.Add(new XElement(S + "v", Convert.ToString(value, CultureInfo.InvariantCulture)));
         else { cell.SetAttributeValue("t", "inlineStr"); cell.Add(new XElement(S + "is", new XElement(S + "t", new XAttribute(XNamespace.Xml + "space", "preserve"), Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""))); }
         return cell;
     }
-    private static void FillRows(XElement sheet, List<object?[]> rows)
+
+    private static int ColumnIndex(string reference)
     {
-        if (rows.Count > 1_048_574) throw new InvalidDataException("追溯记录超过单页Excel上限，请分批导出。");
-        var data = sheet.Element(S + "sheetData")!;
-        var prototype = new XElement(data.Elements(S + "row").First(r => (int?)r.Attribute("r") == 3));
-        data.Elements(S + "row").Where(r => (int?)r.Attribute("r") >= 3).Remove();
-        for (var i = 0; i < rows.Count; i++)
-        {
-            var row = new XElement(prototype); row.SetAttributeValue("r", i + 3);
-            foreach (var cell in row.Elements(S + "c"))
-            {
-                var column = new string(((string)cell.Attribute("r")!).TakeWhile(char.IsAsciiLetter).ToArray());
-                cell.SetAttributeValue("r", column + (i + 3)); cell.RemoveNodes(); cell.Attribute("t")?.Remove();
-            }
-            data.Add(row);
-            for (var j = 0; j < rows[i].Length; j++) SetCell(sheet, XlsxWriter.ColumnName(j + 1) + (i + 3), rows[i][j]);
-        }
-        sheet.Element(S + "dimension")?.Remove();
+        var value = 0;
+        foreach (var ch in reference.TakeWhile(char.IsAsciiLetter)) value = value * 26 + ch - 'A' + 1;
+        return value;
     }
     private static string RedStyle(string original, XElement styles, Dictionary<string, string> cache)
     {

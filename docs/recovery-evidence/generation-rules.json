@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-09",
+  "assembly": "original-release/MRO-Windows-x64/Mro.HelperApp/Mro.Core.dll",
+  "assembly_sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20",
+  "method_evidence": [
+    "Mro.Core.StandardLibrary.StandardWorkbookImporter.ReadProducts / ParseOptionalPercentage",
+    "Mro.Core.Helper.HelperWeighingWorkbookBuilder.Build / ResolveMaximumWeightFromFloatingRatio",
+    "Mro.Core.Helper.RandomPassWeightGenerator.GenerateWeights / GenerateCenteredWeight / OverwriteEdgeWeights / OverwriteRepeatedMiddleWeights"
+  ],
+  "inspection_method": "ILSpy 9.1.0.7988 decompilation of selected types; original generator executed separately for deterministic comparison only.",
+  "maximum": "Manual maximum wins; otherwise nominal * FloatingRatioPercent / 100. Percentage must be >= 100. Missing ratio requires manual input.",
+  "distribution": "Average six random values for centered weights; replace 1-2 reserved positions near the high 5% edge, then 1-2 near the low 5% edge; replace 2-3 remaining positions with a repeated middle candidate. Cap position counts by available slots.",
+  "precision": "Original one-decimal AwayFromZero rounding; builder rejects values outside the requested bounds. Added clamping has been removed.",
+  "timestamps": "Original fixed generatedAt date for every row; one-second time increments. Added date rollover correction removed.",
+  "comparison": {
+    "script": "scripts/Compare-LegacyGenerator.ps1 (PowerShell 7.4+ after Release build)",
+    "seeds": [
+      1,
+      7,
+      29,
+      1234
+    ],
+    "counts": [
+      1,
+      2,
+      3,
+      7,
+      32,
+      98
+    ],
+    "range_grams": [
+      90,
+      99
+    ],
+    "passed_cases": 24
+  },
+  "correction_to_old_ui_text": "The old UI description nominal + allowed shortage contradicts the actual builder. Actual maximum derives from floating ratio, not shortage.",
+  "new_behaviors": [
+    "2026-11-10 user authorization: numeric ratio 110, Excel percentage 110%, original percentage text and saved formula results are accepted.",
+    "2026-11-10 user confirmation: helper uses round(count*0.8) samples in the outer quarters, balanced low/high, remaining samples in the middle half, shuffled; one-decimal representable values stay within bands."
+  ],
+  "current_rule_details": "docs/CUSTOMER-CHANGES.md",
+  "historical_comparison_note": "The 24 exact legacy matches above describe the 2026-11-09 baseline. Compare-LegacyGenerator.ps1 now validates the authorized 80/20 quota and reports expected differences from the original; supplementation comparison remains unchanged.",
+  "current_scope": "Original helper generates only the eight-column weighing workbook; report generation stays in MainApp."
+}

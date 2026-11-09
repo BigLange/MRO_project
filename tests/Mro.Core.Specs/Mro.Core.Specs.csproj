@@ -6,5 +6,7 @@
     <ProjectReference Include="../../src/Mro.Core/Mro.Core.csproj" />
     <Content Include="../../SharedContent/检测标准表.xlsx" Link="SharedContent/检测标准表.xlsx" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx" Link="SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../SharedContent/ReferenceReports/*.xlsx" Link="SharedContent/ReferenceReports/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../SharedContent/WeighingTemplate.xlsx" Link="SharedContent/WeighingTemplate.xlsx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

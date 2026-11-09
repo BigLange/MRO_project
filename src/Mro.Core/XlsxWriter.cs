@@ -4,7 +4,7 @@ using System.Xml.Linq;
 
 namespace Mro.Core;
 
-public sealed record WorkbookPage(string Name, List<object?[]> Rows, List<string>? Merges = null);
+public sealed record WorkbookPage(string Name, List<object?[]> Rows, List<string>? Merges = null, int HeaderRows = 2);
 
 public static class XlsxWriter
 {
@@ -74,7 +74,7 @@ public static class XlsxWriter
             new XElement(S + "borders", new XAttribute("count", 2), new XElement(S + "border"),
                 new XElement(S + "border", new[] { "left", "right", "top", "bottom" }.Select(side => new XElement(S + side, new XAttribute("style", "thin"), new XElement(S + "color", new XAttribute("rgb", "FFD5CCC2")))))),
             new XElement(S + "cellStyleXfs", new XAttribute("count", 1), new XElement(S + "xf", new XAttribute("numFmtId", 0), new XAttribute("fontId", 0), new XAttribute("fillId", 0), new XAttribute("borderId", 0))),
-            new XElement(S + "cellXfs", new XAttribute("count", 3), Xf(0, 0, 0), Xf(1, 2, 0), Xf(0, 0, 164)),
+            new XElement(S + "cellXfs", new XAttribute("count", 4), Xf(0, 0, 0), Xf(1, 2, 0), Xf(0, 0, 164), Xf(0, 0, 49)),
             new XElement(S + "cellStyles", new XAttribute("count", 1), new XElement(S + "cellStyle", new XAttribute("name", "Normal"), new XAttribute("xfId", 0), new XAttribute("builtinId", 0))));
     }
 
@@ -84,12 +84,12 @@ public static class XlsxWriter
         var data = new XElement(S + "sheetData");
         for (var r = 0; r < page.Rows.Count; r++)
         {
-            var row = new XElement(S + "row", new XAttribute("r", r + 1), new XAttribute("ht", r < 2 ? 30 : 24), new XAttribute("customHeight", 1));
+            var row = new XElement(S + "row", new XAttribute("r", r + 1), new XAttribute("ht", r < page.HeaderRows ? 30 : 24), new XAttribute("customHeight", 1));
             for (var c = 0; c < page.Rows[r].Length; c++)
             {
                 var value = page.Rows[r][c];
                 var numeric = value is decimal or double or float or int or long;
-                var cell = new XElement(S + "c", new XAttribute("r", ColumnName(c + 1) + (r + 1)), new XAttribute("s", r < 2 ? 1 : numeric ? 2 : 0));
+                var cell = new XElement(S + "c", new XAttribute("r", ColumnName(c + 1) + (r + 1)), new XAttribute("s", r < page.HeaderRows ? 1 : numeric ? 2 : 3));
                 if (numeric) cell.Add(new XElement(S + "v", Convert.ToString(value, CultureInfo.InvariantCulture)));
                 else cell.Add(new XAttribute("t", "inlineStr"), new XElement(S + "is", new XElement(S + "t", new XAttribute(XNamespace.Xml + "space", "preserve"), Convert.ToString(value, CultureInfo.InvariantCulture) ?? "")));
                 row.Add(cell);
@@ -97,7 +97,8 @@ public static class XlsxWriter
             data.Add(row);
         }
         var sheet = new XElement(S + "worksheet",
-            new XElement(S + "sheetViews", new XElement(S + "sheetView", new XAttribute("workbookViewId", 0), new XElement(S + "pane", new XAttribute("ySplit", 2), new XAttribute("topLeftCell", "A3"), new XAttribute("activePane", "bottomLeft"), new XAttribute("state", "frozen")))),
+            new XElement(S + "sheetViews", new XElement(S + "sheetView", new XAttribute("workbookViewId", 0), new XAttribute("showGridLines", 0),
+                new XElement(S + "pane", new XAttribute("ySplit", page.HeaderRows), new XAttribute("topLeftCell", "A" + (page.HeaderRows + 1)), new XAttribute("activePane", "bottomLeft"), new XAttribute("state", "frozen")))),
             new XElement(S + "cols", Enumerable.Range(1, columnCount).Select(c => new XElement(S + "col", new XAttribute("min", c), new XAttribute("max", c), new XAttribute("width", c >= 7 ? 28 : 19), new XAttribute("customWidth", 1)))), data);
         if (page.Merges is { Count: > 0 }) sheet.Add(new XElement(S + "mergeCells", new XAttribute("count", page.Merges.Count), page.Merges.Select(m => new XElement(S + "mergeCell", new XAttribute("ref", m)))));
         sheet.Add(new XElement(S + "pageMargins", new XAttribute("left", 0.25), new XAttribute("right", 0.25), new XAttribute("top", 0.4), new XAttribute("bottom", 0.4), new XAttribute("header", 0.2), new XAttribute("footer", 0.2)),

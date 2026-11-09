@@ -5,7 +5,7 @@ using System.Xml.Linq;
 
 namespace Mro.Core;
 
-public sealed record SheetCell(string Text, bool IsFormula, bool IsNumeric);
+public sealed record SheetCell(string Text, bool IsFormula, bool IsNumeric, bool IsPercentage = false);
 public sealed record SheetRow(int Number, Dictionary<int, SheetCell> Cells)
 {
     public string At(int column)
@@ -43,6 +43,13 @@ public static class XlsxReader
         var stringsEntry = archive.GetEntry("xl/sharedStrings.xml");
         string[] strings = stringsEntry is null ? [] : Xml(stringsEntry).Root!.Elements(S + "si")
             .Select(e => string.Concat(e.Descendants(S + "t").Select(t => t.Value))).ToArray();
+        var stylesEntry = archive.GetEntry("xl/styles.xml");
+        var styles = stylesEntry is null ? null : Xml(stylesEntry).Root;
+        var numberFormats = styles?.Element(S + "numFmts")?.Elements(S + "numFmt")
+            .ToDictionary(f => (int)f.Attribute("numFmtId")!, f => (string?)f.Attribute("formatCode") ?? "") ?? [];
+        var percentageStyles = styles?.Element(S + "cellXfs")?.Elements(S + "xf")
+            .Select(f => (int?)f.Attribute("numFmtId") ?? 0)
+            .Select(id => id is 9 or 10 || numberFormats.GetValueOrDefault(id, "").Contains('%')).ToArray() ?? [];
         var result = new List<WorkbookSheet>();
         foreach (var sheet in workbook.Descendants(S + "sheet"))
         {
@@ -70,7 +77,9 @@ public static class XlsxReader
                     }
                     else if (kind == "inlineStr") text = string.Concat(cell.Descendants(S + "t").Select(t => t.Value));
                     else text = value;
-                    cells[column] = new(text, cell.Element(S + "f") is not null, kind is null or "n");
+                    var style = (int?)cell.Attribute("s") ?? 0;
+                    cells[column] = new(text, cell.Element(S + "f") is not null, kind is null or "n",
+                        style >= 0 && style < percentageStyles.Length && percentageStyles[style]);
                 }
                 rows.Add(new((int?)row.Attribute("r") ?? rows.Count + 1, cells));
             }

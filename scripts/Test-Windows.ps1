@@ -1,6 +1,11 @@
-param([switch]$Package)
+param([switch]$Package, [string]$DotnetPath)
 $ErrorActionPreference = "Stop"
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+if (-not $DotnetPath) {
+    $portableSdk = Join-Path $env:LOCALAPPDATA "MRO-Recovered\dev-tools\dotnet\dotnet.exe"
+    if (Test-Path -LiteralPath $portableSdk) { $DotnetPath = $portableSdk }
+    elseif (Get-Command dotnet -ErrorAction SilentlyContinue) { $DotnetPath = (Get-Command dotnet).Source }
+}
+if (-not $DotnetPath -or -not (Test-Path -LiteralPath $DotnetPath)) {
     throw "Install the .NET 8 SDK for Windows x64, then reopen PowerShell. Desktop Runtime alone cannot build this project."
 }
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -12,15 +17,15 @@ try {
     Start-Transcript -Path $logPath | Out-Null
     $transcriptStarted = $true
     function Invoke-Dotnet([string[]]$CommandArguments) {
-        & dotnet @CommandArguments
+        & $DotnetPath @CommandArguments
         if ($LASTEXITCODE -ne 0) { throw "dotnet failed with exit code $LASTEXITCODE. See $logPath" }
     }
     Invoke-Dotnet -CommandArguments @("--info")
     Invoke-Dotnet -CommandArguments @("build", "Mro.sln", "-c", "Release", "--nologo")
     Invoke-Dotnet -CommandArguments @("run", "--project", "tests/Mro.Core.Specs", "-c", "Release", "--no-build")
     if ($Package) {
-        Invoke-Dotnet -CommandArguments @("publish", "apps/Mro.MainApp", "-c", "Release", "-r", "win-x64", "--self-contained", "false", "-o", "artifacts/windows/MainApp")
-        Invoke-Dotnet -CommandArguments @("publish", "apps/Mro.HelperApp", "-c", "Release", "-r", "win-x64", "--self-contained", "false", "-o", "artifacts/windows/HelperApp")
+        Invoke-Dotnet -CommandArguments @("publish", "apps/Mro.MainApp", "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-o", "artifacts/windows/MainApp")
+        Invoke-Dotnet -CommandArguments @("publish", "apps/Mro.HelperApp", "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-o", "artifacts/windows/HelperApp")
         Write-Host "Published: artifacts/windows/MainApp and artifacts/windows/HelperApp"
         & (Join-Path $PSScriptRoot "Package-Windows.ps1")
     }

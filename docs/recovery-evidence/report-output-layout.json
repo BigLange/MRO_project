@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-09",
+  "customer_requirement": "Restore separate product detail workbooks and a separate summary workbook; this is a required customer feature.",
+  "assembly": "original-release/MRO-Windows-x64/Mro.HelperApp/Mro.Core.dll",
+  "method": "Mro.Core.ExcelExport.BatchWorkbookExporter.Export",
+  "evidence": "Decompiled exporter lines 116-138, also recorded in supported-il.json.",
+  "original_detail_name": "{prefix}_{productName}_批次检测报告.xlsx",
+  "original_summary_name": "{prefix}_批次检测报告结果.xlsx",
+  "implementation": [
+    "HelperApp generates only the original eight-column weighing workbook.",
+    "MainApp exports independent product workbooks plus a separate summary, using the original templates with no extra markers, columns, trace or notes.",
+    "Original sensory/date defaults, conclusion wording and product-code ordering restored.",
+    "Legacy same-name replacement behavior retained; staging and rollback protect previous files on failure."
+  ],
+  "core_validation": "17 legacy-baseline checks; 24 helper generator comparisons and 24 supplementation/trimming comparisons against the original DLL."
+}

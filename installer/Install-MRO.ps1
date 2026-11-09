@@ -5,9 +5,12 @@ $product = "MRO-Recovered"
 $markerPath = Join-Path $installRoot ".managed-install.json"
 $names = @("马里奥产品抽检分类系统（恢复版）", "马里奥产品抽检辅助系统（恢复版）")
 $apps = @("Mro.MainApp", "Mro.HelperApp")
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw "Install .NET 8 Desktop Runtime (Windows x64) first." }
-$runtimes = & dotnet --list-runtimes
-if ($LASTEXITCODE -ne 0 -or -not ($runtimes -match '^Microsoft.WindowsDesktop.App 8\.')) { throw "Install .NET 8 Desktop Runtime (Windows x64) first." }
+$selfContained = @($apps | Where-Object { -not (Test-Path -LiteralPath (Join-Path $packageRoot "$_\coreclr.dll")) }).Count -eq 0
+if (-not $selfContained) {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw "Install .NET 8 Desktop Runtime (Windows x64) first." }
+    $runtimes = & dotnet --list-runtimes
+    if ($LASTEXITCODE -ne 0 -or -not ($runtimes -match '^Microsoft.WindowsDesktop.App 8\.')) { throw "Install .NET 8 Desktop Runtime (Windows x64) first." }
+}
 $manifestPath = Join-Path $packageRoot "package-manifest.json"
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Package manifest is missing. Run scripts/Test-Windows.ps1 -Package first." }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json

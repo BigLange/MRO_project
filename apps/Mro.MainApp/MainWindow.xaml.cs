@@ -4,6 +4,7 @@ using System.Windows;
 using Microsoft.Win32;
 using Mro.Core;
 using Mro.Recovered.UI;
+using UiState = Mro.Recovered.UI.WindowState;
 
 namespace Mro.MainApp;
 
@@ -33,23 +34,23 @@ public partial class MainWindow : Window
         var dialog = new OpenFolderDialog { Title = "选择报告输出文件夹" };
         if (dialog.ShowDialog(this) == true) state.OutputDirectoryPath = dialog.FolderName;
     }
-    private void Analyze_Click(object sender, RoutedEventArgs e) => state.Run("分析称重表", () => { WindowState.CommitGrid(this); state.Analyze(); });
+    private void Analyze_Click(object sender, RoutedEventArgs e) => state.Run("分析称重表", () => { UiState.CommitGrid(this); state.Analyze(); });
     private void ImportProduction_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Filter = "Excel 工作簿 (*.xlsx)|*.xlsx", CheckFileExists = true, InitialDirectory = state.PreferredProductionDirectory ?? "" };
-        if (dialog.ShowDialog(this) == true) state.Run("导入生产表", () => { WindowState.CommitGrid(this); state.ImportProduction(dialog.FileName); });
+        if (dialog.ShowDialog(this) == true) state.Run("导入生产表", () => { UiState.CommitGrid(this); state.ImportProduction(dialog.FileName); });
     }
-    private void CheckSamples_Click(object sender, RoutedEventArgs e) => state.Run("检查抽样数量", () => { WindowState.CommitGrid(this); state.Analyze(); state.CheckSamples(); });
-    private void ExportReport_Click(object sender, RoutedEventArgs e) => state.Run("导出实测报告", () => { WindowState.CommitGrid(this); state.ExportReport(); });
+    private void CheckSamples_Click(object sender, RoutedEventArgs e) => state.Run("一键生成标准抽样基数", () => { UiState.CommitGrid(this); state.FillStandardBatchSizes(); });
+    private void ExportReport_Click(object sender, RoutedEventArgs e) => state.Run("导出检测报告", () => { UiState.CommitGrid(this); state.ExportReport(); });
     private void FilterLogs_Click(object sender, RoutedEventArgs e) => state.RefreshLogs();
     private void RefreshLogs_Click(object sender, RoutedEventArgs e) => state.RefreshLogs();
 }
 
-public sealed class MainState : WindowState
+public sealed class MainState : UiState
 {
     protected override string ApplicationName => "马里奥产品抽检分类系统";
     private string standardWorkbookPath = Paths.Standard, weighingWorkbookPath = "";
-    private string outputDirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MRO实测报告");
+    private string outputDirectoryPath = Path.Combine(AppContext.BaseDirectory, "Exports");
     private DateTime? reportDate = DateTime.Today;
     public string StandardWorkbookPath { get => standardWorkbookPath; set => Set(ref standardWorkbookPath, value); }
     public string WeighingWorkbookPath { get => weighingWorkbookPath; set => Set(ref weighingWorkbookPath, value); }
@@ -71,8 +72,8 @@ public sealed class MainState : WindowState
         PreferredWeighingDirectory = UserFolderPreferenceStore.GetExistingDirectory(preferences.MainWeighingWorkbookDirectory);
         PreferredProductionDirectory = UserFolderPreferenceStore.GetExistingDirectory(preferences.MainProductionWorkbookDirectory);
         if (PreferenceStore.LoadWarning is string warning) IssueRows.Add(new("路径偏好", warning));
-        if (File.Exists(Paths.Catalog)) { var catalog = GetCatalog(); StatusMessage = $"已加载共享标准库：{catalog.Products.Count} 个产品。请选择真实称重表。"; }
-        else StatusMessage = "请先导入标准库，再选择真实称重记录。";
+        if (File.Exists(Paths.Catalog)) { var catalog = GetCatalog(); StatusMessage = $"已加载共享标准库：{catalog.Products.Count} 个产品。请选择称重表。"; }
+        else StatusMessage = "请先导入标准库，再选择称重记录。";
     }
     public void ImportStandard()
     {
@@ -85,23 +86,24 @@ public sealed class MainState : WindowState
     }
     public void Analyze()
     {
-        if (productionWorkbookPath.Length > 0) ProductionEntries = ProductionImporter.Read(productionWorkbookPath, GetCatalog());
-        MeasurementFile = WeighingWorkbookPath;
+        ProductionEntries = [];
+        var path = Path.GetFullPath(WeighingWorkbookPath);
+        var previous = string.Equals(MeasurementFile, path, StringComparison.OrdinalIgnoreCase) ? ProductRows : null;
         var input = MeasurementImporter.Read(WeighingWorkbookPath);
-        var rows = GroupRows(input, ProductRows);
+
+        var rows = GroupRows(input, previous);
+        MeasurementFile = path;
         Measurements = input;
         ProductRows.Clear();
         foreach (var row in rows) ProductRows.Add(row);
-        StatusMessage = $"已读取 {input.Count} 条称重记录、{rows.Count} 个条码；请核实问题并填写抽样基数。";
+        StatusMessage = $"已读取 {input.Count} 条称重记录、{rows.Count} 个产品，请录入抽样基数。";
     }
     public void ImportProduction(string path)
     {
         ProductionEntries = ProductionImporter.Read(path, GetCatalog());
         productionWorkbookPath = path;
         PreferredProductionDirectory = Path.GetDirectoryName(path);
-        var rows = GroupRows(Measurements, ProductRows);
-        var imported = ProductionEntries.ToDictionary(e => e.Barcode);
-        foreach (var row in rows) if (imported.TryGetValue(row.Barcode, out var entry)) row.BatchSizeText = entry.BatchSize.ToString();
+        var rows = GroupRows(Measurements, null);
         ProductRows.Clear(); foreach (var row in rows) ProductRows.Add(row);
         StatusMessage = $"已导入 {ProductionEntries.Count} 条生产记录；缺少称重记录的产品会提示缺测。";
     }
@@ -111,6 +113,13 @@ public sealed class MainState : WindowState
         MainWeighingWorkbookPath = WeighingWorkbookPath, MainWeighingWorkbookDirectory = Path.GetDirectoryName(WeighingWorkbookPath),
         MainOutputDirectory = OutputDirectoryPath, MainProductionWorkbookDirectory = PreferredProductionDirectory
     });
+    public void FillStandardBatchSizes()
+    {
+        if (ProductRows.Count == 0) Analyze();
+        var catalog = GetCatalog();
+        foreach (var row in ProductRows) row.BatchSizeText = LegacyInspection.StandardBatchSize(catalog, row.RecordCount).ToString();
+        StatusMessage = $"已为 {ProductRows.Count} 个产品生成标准抽样基数。";
+    }
     public void CheckSamples() => Check(ProductRows);
     public void ExportReport()
     {
@@ -118,8 +127,9 @@ public sealed class MainState : WindowState
         CheckSamples();
         if (ReportDate is null) throw new InvalidDataException("请选择报告日期。");
         if (string.IsNullOrWhiteSpace(OutputDirectoryPath)) throw new InvalidDataException("请选择输出文件夹。");
-        var path = Path.Combine(OutputDirectoryPath, $"实测报告_{ReportDate:yyyyMMdd}_{DateTime.Now:HHmmssfff}.xlsx");
-        WorkbookExports.Report(path, GetCatalog(), Measurements, Batches(ProductRows), ReportDate.Value, Paths.ReportTemplate, ProductionEntries);
-        StatusMessage = "报告已导出：" + path;
+        var path = Path.Combine(OutputDirectoryPath, $"批次检测报告_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+        var reports = WorkbookExports.Report(path, GetCatalog(), Measurements, Batches(ProductRows), ReportDate.Value, Paths.ReportTemplate, Entries(ProductRows));
+        OperationOutputPaths = string.Join(Environment.NewLine, reports.AllPaths);
+        StatusMessage = $"已分别导出 {reports.DetailPaths.Count} 份商品明细及1份汇总，文件路径见运行日志。";
     }
 }

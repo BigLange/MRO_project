@@ -19,14 +19,17 @@ public abstract class ObservableModel : INotifyPropertyChanged
 
 public sealed class ProductRow : ObservableModel
 {
-    private string barcode = "", batchSizeText = "", requiredSampleCount = "";
+    private string barcode = "", batchSizeText = "", requiredSampleCount = "", maximumWeightText = "", batchId = "", productionDate = "", sensoryResult = "", code = "", productName = "";
     public string Barcode { get => barcode; set => Set(ref barcode, value); }
-    public string Code { get; set; } = "";
-    public string ProductName { get; set; } = "";
+    public string Code { get => code; set => Set(ref code, value); }
+    public string ProductName { get => productName; set => Set(ref productName, value); }
     public int RecordCount { get; set; }
     public string BatchSizeText { get => batchSizeText; set => Set(ref batchSizeText, value); }
-    // Kept to match the original binding; this is now a read-only measured-record count.
-    public string MaximumWeightText => RecordCount.ToString();
+    public string MaximumWeightText { get => maximumWeightText; set => Set(ref maximumWeightText, value); }
+    public string BatchId { get => batchId; set => Set(ref batchId, value); }
+    public string ProductionDate { get => productionDate; set => Set(ref productionDate, value); }
+    public string SensoryResult { get => sensoryResult; set => Set(ref sensoryResult, value); }
+    public string Key => InspectionKey.For(Barcode, BatchId);
     public string RequiredSampleCount { get => requiredSampleCount; set => Set(ref requiredSampleCount, value); }
 }
 
@@ -41,12 +44,12 @@ public sealed record LogRow(DateTime Time, string Application, string Operation,
 public static class Paths
 {
     public static string State => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MRO-Recovered");
-    public static string Catalog => System.IO.Path.Combine(State, "standard-catalog.v2.json");
+    public static string Catalog => System.IO.Path.Combine(State, "standard-catalog.v4.json");
     public static string Preferences => System.IO.Path.Combine(State, "folder-preferences.json");
     public static string Content => System.IO.Path.Combine(AppContext.BaseDirectory, "SharedContent");
     public static string Standard => System.IO.Path.Combine(Content, "检测标准表.xlsx");
     public static string Plan => System.IO.Path.Combine(Content, "sampling-plan.json");
-    public static string ReportTemplate => System.IO.Path.Combine(Content, "ReportTemplates", "MRO-ReportTemplate.xlsx");
+    public static string ReportTemplate => System.IO.Path.Combine(Content, "ReferenceReports", "检测报告2.xlsx");
     public static StandardCatalog LoadCatalog() => JsonSerializer.Deserialize<StandardCatalog>(File.ReadAllText(Catalog), DataFiles.Json)
         ?? throw new InvalidDataException("共享标准库为空，请在主程序中重新导入。");
 }
@@ -63,7 +66,7 @@ public static class StartupErrors
 
 public abstract class WindowState : ObservableModel
 {
-    private string statusMessage = "恢复版：请先导入标准库及真实称重记录。";
+    private string statusMessage = "恢复版：请先导入标准库及称重记录。";
     private string logApplicationFilter = "", logOperationFilter = "", logResultFilter = "";
     protected abstract string ApplicationName { get; }
     public string StatusMessage { get => statusMessage; set => Set(ref statusMessage, value); }
@@ -76,6 +79,7 @@ public abstract class WindowState : ObservableModel
     protected StandardCatalog? Catalog { get; set; }
     protected List<Measurement> Measurements { get; set; } = [];
     protected string MeasurementFile { get; set; } = "";
+    protected string OperationOutputPaths { get; set; } = "";
     protected List<ProductionEntry> ProductionEntries { get; set; } = [];
     protected UserFolderPreferenceStore PreferenceStore { get; } = new(Paths.Preferences);
     private string LogFile => System.IO.Path.Combine(Paths.State, "operations.jsonl");
@@ -83,6 +87,7 @@ public abstract class WindowState : ObservableModel
     public void Run(string operation, Action action)
     {
         IssueRows.Clear();
+        OperationOutputPaths = "";
         try { action(); AppendLog(operation, "Success", StatusMessage, ""); }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or JsonException or InvalidOperationException or System.Xml.XmlException or OverflowException)
         {
@@ -96,6 +101,7 @@ public abstract class WindowState : ObservableModel
     protected StandardCatalog GetCatalog()
     {
         // Re-read to observe updates made by the other app.
+        if (!File.Exists(Paths.Catalog)) throw new InvalidDataException("请先在主程序重新导入表1标准库（按旧版规则重新读取）。");
         Catalog = Paths.LoadCatalog();
         StandardImporter.ValidateRules(Catalog.SamplingRules);
         return Catalog;
@@ -104,28 +110,70 @@ public abstract class WindowState : ObservableModel
     protected List<ProductRow> GroupRows(List<Measurement> input, IEnumerable<ProductRow>? previous = null)
     {
         var catalog = GetCatalog();
-        var batches = (previous ?? []).GroupBy(r => r.Barcode).ToDictionary(g => g.Key, g => g.First().BatchSizeText);
+        var prior = (previous ?? []).GroupBy(r => r.Key).ToDictionary(g => g.Key, g => g.First());
         var rows = new List<ProductRow>();
-        var measurementGroups = input.GroupBy(m => m.Barcode).ToDictionary(g => g.Key, g => g.Count());
-        var production = ProductionEntries.ToDictionary(e => e.Barcode);
-        foreach (var barcode in measurementGroups.Keys.Union(production.Keys))
+        var measurementGroups = input.GroupBy(m => m.Key).ToDictionary(g => g.Key, g => g.ToList());
+        var production = ProductionEntries.ToDictionary(e => e.Key);
+        foreach (var key in measurementGroups.Keys.Union(production.Keys))
         {
+            var measured = measurementGroups.GetValueOrDefault(key);
+            var entry = production.GetValueOrDefault(key);
+            var barcode = entry?.Barcode ?? measured![0].Barcode;
             ProductStandard? product = null;
             try { product = catalog.Resolve(barcode); }
             catch (InvalidDataException ex) { IssueRows.Add(new("条码关联失败", ex.Message)); }
-            var batch = batches.GetValueOrDefault(barcode, "");
+            var previousRow = prior.GetValueOrDefault(key);
             rows.Add(new() { Barcode = barcode, Code = product?.Code ?? "", ProductName = product?.ProductName ?? "未匹配或条码重复",
-                RecordCount = measurementGroups.GetValueOrDefault(barcode), BatchSizeText = batch.Length > 0 ? batch : production.GetValueOrDefault(barcode)?.BatchSize.ToString() ?? "" });
+                BatchId = entry?.BatchId ?? measured![0].BatchId, RecordCount = measured?.Count ?? 0,
+                BatchSizeText = previousRow?.BatchSizeText ?? entry?.BatchSize.ToString() ?? measured?.FirstOrDefault()?.BatchSize?.ToString() ?? "",
+                MaximumWeightText = previousRow?.MaximumWeightText ?? entry?.MaximumWeightGrams?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                ProductionDate = previousRow?.ProductionDate ?? entry?.ProductionDate ?? measured?.FirstOrDefault()?.ProductionDate ?? "",
+                SensoryResult = previousRow?.SensoryResult ?? entry?.SensoryResult ?? measured?.FirstOrDefault()?.SensoryResult ?? "" });
         }
-        return rows;
+        return rows.OrderBy(r => r.Code, ProductCodeComparer.Instance).ToList();
     }
 
     protected Dictionary<string, string> Batches(IEnumerable<ProductRow> rows)
     {
         var list = rows.ToList();
         if (list.Any(r => string.IsNullOrWhiteSpace(r.Barcode))) throw new InvalidDataException("有条目没有填写条码。");
-        if (list.GroupBy(r => r.Barcode.Trim()).Any(g => g.Count() > 1)) throw new InvalidDataException("存在重复条码条目，请合并为一条并核实生产数量。");
-        return list.ToDictionary(r => r.Barcode.Trim(), r => r.BatchSizeText);
+        if (list.GroupBy(r => r.Key).Any(g => g.Count() > 1)
+            || list.GroupBy(r => r.Barcode.Trim()).Any(g => g.Count() > 1 && g.Any(r => string.IsNullOrWhiteSpace(r.BatchId))))
+            throw new InvalidDataException("同一商品多个条目必须填写不同批号。");
+        return list.ToDictionary(r => r.Key, r => r.BatchSizeText);
+    }
+
+    protected List<ProductionEntry> Entries(IEnumerable<ProductRow> rows)
+    {
+        var list = rows.ToList();
+        Batches(list);
+        var source = ProductionEntries.ToDictionary(e => e.Key);
+        return list.Select(row =>
+        {
+            var original = source.GetValueOrDefault(row.Key);
+            return new ProductionEntry(row.Barcode.Trim(), DataFiles.PositiveInteger(row.BatchSizeText, "生产数量"), row.ProductName,
+                row.ProductionDate.Trim(), original?.SourceFile ?? "界面录入", original?.SourceSheet ?? "", original?.SourceRow ?? 0,
+                row.BatchId.Trim(), row.MaximumWeightText.Trim().Length > 0 ? DataFiles.Decimal(row.MaximumWeightText, "最大重量") : null, row.SensoryResult.Trim());
+        }).ToList();
+    }
+
+    protected void Preview(IEnumerable<ProductRow> rows)
+    {
+        var list = rows.ToList();
+        var catalog = GetCatalog();
+        if (list.Count == 0) throw new InvalidDataException("请导入表2商品表或添加条目。");
+        var total = 0;
+        foreach (var row in list)
+        {
+            var product = catalog.Resolve(row.Barcode);
+            row.Code = product.Code; row.ProductName = product.ProductName;
+            var batch = DataFiles.PositiveInteger(row.BatchSizeText, "生产数量");
+            var required = catalog.RequiredSamples(batch);
+            row.RequiredSampleCount = required.ToString();
+            Generation.MaximumWeight(product, row.MaximumWeightText.Trim().Length == 0 ? null : DataFiles.Decimal(row.MaximumWeightText, "最大重量"));
+            total = checked(total + required);
+        }
+        StatusMessage = $"预览通过：{list.Count} 个商品批次，共生成 {total} 条称重记录。";
     }
 
     protected void Check(IEnumerable<ProductRow> rows)
@@ -141,7 +189,7 @@ public abstract class WindowState : ObservableModel
             catch (InvalidDataException) { row.RequiredSampleCount = "待核实"; }
         }
         InspectionValidator.Validate(catalog, Measurements, Batches(rowList));
-        StatusMessage = $"抽样数量核对通过：{rowList.Count} 个产品，{Measurements.Count} 条真实测量记录。";
+        StatusMessage = $"抽样数量核对通过：{rowList.Count} 个产品，{Measurements.Count} 条测量记录。";
     }
 
     private void AppendLog(string operation, string result, string message, string error)
@@ -149,7 +197,8 @@ public abstract class WindowState : ObservableModel
         try
         {
             Directory.CreateDirectory(Paths.State);
-            var entry = new LogRow(DateTime.Now, ApplicationName, operation, result, message, MeasurementFile, error);
+        var entry = new LogRow(DateTime.Now, ApplicationName, operation, result, message,
+            OperationOutputPaths.Length > 0 ? OperationOutputPaths : MeasurementFile, error);
             File.AppendAllText(LogFile, JsonSerializer.Serialize(entry) + Environment.NewLine);
         }
         catch (IOException ex) { IssueRows.Add(new("日志保存失败", ex.Message)); }

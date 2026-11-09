@@ -1,6 +1,6 @@
 {
   "status": "Recovered legacy application behaviour; not independently verified against legislation.",
-  "user_selected_scope": "Restore the original judging rules and explicitly mark pending regulatory review.",
+  "user_selected_scope": "Restore original behavior and original Excel templates. Do not add or change business behavior without an explicit subsequent user request.",
   "sources": {
     "assembly": "Mro.Core.dll",
     "method_evidence": "docs/recovery-evidence/supported-il.json",
@@ -15,7 +15,8 @@
     "batch_count": "BatchConclusionJudge.Evaluate",
     "production": "HelperEntryWorkbookImporter.Import: first worksheet A barcode / B quantity",
     "preferences": "UserFolderPreferences: 7 original path fields; store reads/writes JSON",
-    "assembly_sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20"
+    "assembly_sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20",
+    "generation": "docs/recovery-evidence/generation-rules.json"
   },
   "sampling_rules": [
     {
@@ -106,10 +107,10 @@
   },
   "original_count_pass": "T2 count == 0 AND T1 count <= allowed T1; original function does not check the mean.",
   "intentional_changes": [
-    "Do not silently select first duplicate standard barcode, skip unknown production rows, or fabricate missing measurements.",
-    "Block impossible required sample count > production quantity.",
-    "Show mean below nominal and actual/planned count differences separately from original count-only result.",
-    "Do not assume sensory result normal or production date equal to inspection date.",
-    "Combined report workbook and pagination retain all measurements; original exporter wrote separate workbooks."
-  ]
+    "2026-11-10: User authorized floating ratio numeric points, Excel percentages, original text and saved formula results in that column.",
+    "2026-11-10: User confirmed helper distribution of approximately 80% in the outer 25% bands, balanced sides, with 20% in the middle and shuffled rows. See docs/CUSTOMER-CHANGES.md."
+  ],
+  "generation_maximum": "Manual maximum first, else nominal * floating percent / 100. Shortage does not define generation cap.",
+  "shortage_priority": "J column required, no fallback calculation; duplicate barcodes keep the first occurrence.",
+  "restoration_audit": "docs/LEGACY-BASELINE.md"
 }
