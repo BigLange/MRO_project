@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Mro.Core/Mro.Core.csproj" />
+    <Content Include="../../SharedContent/检测标准表.xlsx" Link="SharedContent/检测标准表.xlsx" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx" Link="SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

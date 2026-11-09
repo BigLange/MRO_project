@@ -1,0 +1,278 @@
+[
+  {
+    "app": "Mro.MainApp",
+    "baml_sha256": "a8ce82fa932574f4758ee7e8d2a9a0073ff6254b668a1438c3245a0487b02ebe",
+    "record_count": 973,
+    "record_type_counts": {
+      "1": 1,
+      "28": 6,
+      "29": 7,
+      "3": 186,
+      "20": 4,
+      "31": 30,
+      "36": 245,
+      "6": 49,
+      "13": 1,
+      "32": 7,
+      "37": 1,
+      "38": 7,
+      "55": 7,
+      "39": 4,
+      "4": 186,
+      "34": 6,
+      "46": 44,
+      "56": 7,
+      "14": 1,
+      "7": 26,
+      "8": 26,
+      "11": 7,
+      "12": 7,
+      "42": 23,
+      "16": 23,
+      "43": 23,
+      "35": 28,
+      "45": 10,
+      "2": 1
+    },
+    "resource_keys": [
+      "SurfaceBrush",
+      "CardBrush",
+      "AccentBrush",
+      "InkBrush",
+      "MutedBrush",
+      "CardStyle",
+      "SectionTitleStyle",
+      "{x:Type Button}",
+      "{x:Type TextBox}",
+      "{x:Type ComboBox}",
+      "{x:Type DataGrid}"
+    ],
+    "connections": [
+      {
+        "id": 1,
+        "type": "Button",
+        "name": "RecoveredControl1"
+      },
+      {
+        "id": 2,
+        "type": "Button",
+        "name": "RecoveredControl2"
+      },
+      {
+        "id": 3,
+        "type": "Button",
+        "name": "RecoveredControl3"
+      },
+      {
+        "id": 4,
+        "type": "Button",
+        "name": "RecoveredControl4"
+      },
+      {
+        "id": 5,
+        "type": "Button",
+        "name": "RecoveredControl5"
+      },
+      {
+        "id": 6,
+        "type": "Button",
+        "name": "RecoveredControl6"
+      },
+      {
+        "id": 7,
+        "type": "Button",
+        "name": "RecoveredControl7"
+      },
+      {
+        "id": 8,
+        "type": "Button",
+        "name": "RecoveredControl8"
+      },
+      {
+        "id": 9,
+        "type": "Button",
+        "name": "RecoveredControl9"
+      },
+      {
+        "id": 10,
+        "type": "ListBox",
+        "name": "OperationLogListBox"
+      }
+    ],
+    "text_changes": [
+      {
+        "property": "Content",
+        "before": "一键生成标准抽样基数",
+        "after": "检查抽样数量"
+      },
+      {
+        "property": "Text",
+        "before": "模板文件固定使用共享内容中的检测报告1和检测报告2。当前导出流程是：先分析条码，再录入抽样基数；如果仍有问题，系统不会生成最终 Excel。",
+        "after": "先导入生产表与实测记录，再核对抽样基数。缺测、未知条码或无效数量会阻止报告输出。报告采用原表单样式，旧版判定口径仍需法规复核。"
+      }
+    ],
+    "additional_elements": 1,
+    "additional_controls": [
+      "ImportProductionButton"
+    ],
+    "status": "All encountered records handled; XAML XML parsed. WPF compilation and visual comparison pending."
+  },
+  {
+    "app": "Mro.HelperApp",
+    "baml_sha256": "a6d95b5d856a7069724494ccc9e8094a55a08eb569ac2a5f1be8438c8a26ea5a",
+    "record_count": 905,
+    "record_type_counts": {
+      "1": 1,
+      "28": 6,
+      "29": 6,
+      "3": 175,
+      "20": 4,
+      "31": 31,
+      "36": 211,
+      "6": 49,
+      "13": 1,
+      "32": 7,
+      "37": 1,
+      "38": 7,
+      "55": 7,
+      "39": 4,
+      "4": 175,
+      "34": 6,
+      "46": 44,
+      "56": 7,
+      "14": 1,
+      "7": 24,
+      "8": 24,
+      "11": 7,
+      "12": 7,
+      "42": 21,
+      "16": 21,
+      "43": 21,
+      "35": 25,
+      "45": 11,
+      "2": 1
+    },
+    "resource_keys": [
+      "SurfaceBrush",
+      "CardBrush",
+      "AccentBrush",
+      "InkBrush",
+      "MutedBrush",
+      "CardStyle",
+      "SectionTitleStyle",
+      "{x:Type Button}",
+      "{x:Type TextBox}",
+      "{x:Type ComboBox}",
+      "{x:Type DataGrid}"
+    ],
+    "connections": [
+      {
+        "id": 1,
+        "type": "Button",
+        "name": "RecoveredControl1"
+      },
+      {
+        "id": 2,
+        "type": "Button",
+        "name": "RecoveredControl2"
+      },
+      {
+        "id": 3,
+        "type": "Button",
+        "name": "RecoveredControl3"
+      },
+      {
+        "id": 4,
+        "type": "Button",
+        "name": "RecoveredControl4"
+      },
+      {
+        "id": 5,
+        "type": "Button",
+        "name": "RecoveredControl5"
+      },
+      {
+        "id": 6,
+        "type": "Button",
+        "name": "RecoveredControl6"
+      },
+      {
+        "id": 7,
+        "type": "Button",
+        "name": "RecoveredControl7"
+      },
+      {
+        "id": 8,
+        "type": "DataGrid",
+        "name": "EntryGrid"
+      },
+      {
+        "id": 9,
+        "type": "Button",
+        "name": "RecoveredControl9"
+      },
+      {
+        "id": 10,
+        "type": "Button",
+        "name": "RecoveredControl10"
+      },
+      {
+        "id": 11,
+        "type": "ListBox",
+        "name": "OperationLogListBox"
+      }
+    ],
+    "text_changes": [
+      {
+        "property": "Text",
+        "before": "读取共享标准库中的条码与抽样规则，生成一份合格称重数据 Excel。",
+        "after": "读取共享标准库与真实称重记录，核对条码和抽样数量，导出实测称重数据 Excel。"
+      },
+      {
+        "property": "Text",
+        "before": "生成条目",
+        "after": "实测条目"
+      },
+      {
+        "property": "Text",
+        "before": "为每一行输入条码和抽样基数，系统会预览应生成的样品数量。",
+        "after": "导入真实称重记录，为每一行输入条码和抽样基数，核对实测数量。"
+      },
+      {
+        "property": "Content",
+        "before": "导入Excel",
+        "after": "导入实测Excel"
+      },
+      {
+        "property": "Content",
+        "before": "预览样品数",
+        "after": "检查样品数"
+      },
+      {
+        "property": "Content",
+        "before": "生成标准表",
+        "after": "导出实测称重表"
+      },
+      {
+        "property": "Header",
+        "before": "最大值(g)",
+        "after": "实测样品数"
+      },
+      {
+        "property": "Text",
+        "before": "生成规则",
+        "after": "实测规则"
+      },
+      {
+        "property": "Text",
+        "before": "辅助应用生成的称重数据必须全部为 Pass。当前规则是：重量落在 [标准克重, 标准克重 + 允许短缺量]，并统一输出为 g。",
+        "after": "只导出已导入的真实称重记录，统一换算为 g；样品不足时提示缺测，不自动补值或改变测量结果。"
+      }
+    ],
+    "additional_elements": 1,
+    "additional_controls": [
+      "ImportProductionButton"
+    ],
+    "status": "All encountered records handled; XAML XML parsed. WPF compilation and visual comparison pending."
+  }
+]

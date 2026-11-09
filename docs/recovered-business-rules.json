@@ -1,0 +1,115 @@
+{
+  "status": "Recovered legacy application behaviour; not independently verified against legislation.",
+  "user_selected_scope": "Restore the original judging rules and explicitly mark pending regulatory review.",
+  "sources": {
+    "assembly": "Mro.Core.dll",
+    "method_evidence": "docs/recovery-evidence/supported-il.json",
+    "sampling": [
+      "SamplingPlanResolver.Resolve",
+      "SamplingPlanResolver..cctor",
+      "StandardWorkbookImporter.ReadSamplingRules",
+      "StandardWorkbookImporter.ParseUpperBatchSize"
+    ],
+    "shortage_column": "StandardWorkbookImporter.ReadProducts reads column J",
+    "single_sample": "NetContentJudgement.Evaluate",
+    "batch_count": "BatchConclusionJudge.Evaluate",
+    "production": "HelperEntryWorkbookImporter.Import: first worksheet A barcode / B quantity",
+    "preferences": "UserFolderPreferences: 7 original path fields; store reads/writes JSON",
+    "assembly_sha256": "1c937f69bd8cab6a6835f117aebe451854893857bd1b3590f65b4b7072aa7a20"
+  },
+  "sampling_rules": [
+    {
+      "MinimumBatch": 1,
+      "MaximumBatch": 20,
+      "SampleCount": 0,
+      "SampleEntireBatch": true,
+      "AllowedT1Count": 0,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 21,
+      "MaximumBatch": 40,
+      "SampleCount": 32,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 1,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 41,
+      "MaximumBatch": 60,
+      "SampleCount": 35,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 1,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 61,
+      "MaximumBatch": 80,
+      "SampleCount": 47,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 2,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 81,
+      "MaximumBatch": 100,
+      "SampleCount": 49,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 2,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 101,
+      "MaximumBatch": 200,
+      "SampleCount": 64,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 3,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 201,
+      "MaximumBatch": 300,
+      "SampleCount": 67,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 3,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 301,
+      "MaximumBatch": 400,
+      "SampleCount": 81,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 4,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 401,
+      "MaximumBatch": 500,
+      "SampleCount": 81,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 4,
+      "AllowedT2Count": 0
+    },
+    {
+      "MinimumBatch": 501,
+      "MaximumBatch": 100000,
+      "SampleCount": 98,
+      "SampleEntireBatch": false,
+      "AllowedT1Count": 5,
+      "AllowedT2Count": 0
+    }
+  ],
+  "classification": {
+    "Pass": "actual >= nominal",
+    "T1": "nominal - allowedShortage <= actual < nominal",
+    "T2": "actual < nominal - allowedShortage"
+  },
+  "original_count_pass": "T2 count == 0 AND T1 count <= allowed T1; original function does not check the mean.",
+  "intentional_changes": [
+    "Do not silently select first duplicate standard barcode, skip unknown production rows, or fabricate missing measurements.",
+    "Block impossible required sample count > production quantity.",
+    "Show mean below nominal and actual/planned count differences separately from original count-only result.",
+    "Do not assume sensory result normal or production date equal to inspection date.",
+    "Combined report workbook and pagination retain all measurements; original exporter wrote separate workbooks."
+  ]
+}

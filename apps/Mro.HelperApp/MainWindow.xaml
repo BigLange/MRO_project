@@ -1,0 +1,303 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Mro.HelperApp.MainWindow" Title="马里奥产品抽检辅助系统" Width="1260" Height="820" MinWidth="1080" MinHeight="720" WindowStartupLocation="CenterScreen" Background="#EEF3EE" Icon="Assets/new_mario_desktop_icon.ico">
+  <Window.Resources>
+    <ResourceDictionary>
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFDFC" />
+      <SolidColorBrush x:Key="CardBrush" Color="#F8FBF5" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#2F7A53" />
+      <SolidColorBrush x:Key="InkBrush" Color="#1D261F" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#5F6A61" />
+      <Style x:Key="CardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="Border.CornerRadius" Value="20" />
+        <Setter Property="Border.Padding" Value="22" />
+        <Setter Property="Margin" Value="0,0,0,18" />
+      </Style>
+      <Style x:Key="SectionTitleStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+      </Style>
+      <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="Margin" Value="0,0,10,0" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+      </Style>
+      <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}">
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Margin" Value="0,6,0,0" />
+        <Setter Property="BorderBrush" Value="#C8D6C8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      </Style>
+      <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}">
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Margin" Value="0,6,0,0" />
+        <Setter Property="BorderBrush" Value="#C8D6C8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      </Style>
+      <Style x:Key="{x:Type DataGrid}" TargetType="{x:Type DataGrid}">
+        <Setter Property="DataGrid.AutoGenerateColumns" Value="False" />
+        <Setter Property="DataGrid.HeadersVisibility" Value="Column" />
+        <Setter Property="DataGrid.CanUserAddRows" Value="False" />
+        <Setter Property="DataGrid.CanUserDeleteRows" Value="False" />
+        <Setter Property="DataGrid.GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="DataGrid.RowBackground" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="DataGrid.AlternatingRowBackground" Value="#F0F7EF" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Margin" Value="0,14,0,0" />
+      </Style>
+    </ResourceDictionary>
+  </Window.Resources>
+  <Grid>
+    <Grid.Background>
+      <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#EEF5EA" Offset="0" />
+        <GradientStop Color="#E6EFE1" Offset="0.55" />
+        <GradientStop Color="#D8E4D5" Offset="1" />
+      </LinearGradientBrush>
+    </Grid.Background>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <Grid Margin="28">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" CornerRadius="26" Padding="28" Margin="0,0,0,18" Background="#1C2A20">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+            <Border Width="230" Height="108" Margin="0,0,22,0" Background="#FFFFFFFF" CornerRadius="18" Padding="8" VerticalAlignment="Top">
+              <Image Source="Assets/new_mario_title_logo.png" Stretch="Uniform" />
+            </Border>
+            <StackPanel Grid.Column="1">
+              <TextBlock FontSize="32" FontWeight="Bold" Foreground="#F8FBF5" Text="马里奥产品抽检辅助系统" />
+              <TextBlock Margin="0,8,0,0" FontSize="14" Foreground="#D2DFC9" Text="读取共享标准库与真实称重记录，核对条码和抽样数量，导出实测称重数据 Excel。" />
+            </StackPanel>
+            <Border Grid.Column="2" Background="#26342A" CornerRadius="20" Padding="18">
+              <StackPanel>
+                <TextBlock FontSize="12" Foreground="#D2DFC9" Text="当前状态" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFFFF">
+                  <TextBlock.Text>
+                    <Binding Path="StatusMessage" />
+                  </TextBlock.Text>
+                </TextBlock>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Border>
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="170" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="120" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Style="{StaticResource SectionTitleStyle}" Text="输入与输出" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Text="共享标准库" />
+            <TextBox Grid.Row="1" Grid.Column="1" IsReadOnly="True">
+              <TextBox.Text>
+                <Binding Path="StandardStorePath" Mode="OneWay" />
+              </TextBox.Text>
+            </TextBox>
+            <Button Grid.Row="1" Grid.Column="2" Margin="12,6,0,0" Content="重新加载" Click="ReloadStandard_Click" Name="RecoveredControl1" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Text="输出文件" />
+            <TextBox Grid.Row="2" Grid.Column="1">
+              <TextBox.Text>
+                <Binding Path="OutputWorkbookPath" UpdateSourceTrigger="PropertyChanged" />
+              </TextBox.Text>
+            </TextBox>
+            <Button Grid.Row="2" Grid.Column="2" Margin="12,6,0,0" Content="另存为..." Click="ChooseOutput_Click" Name="RecoveredControl2" />
+          </Grid>
+        </Border>
+        <Grid Grid.Row="2">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.55*" />
+            <ColumnDefinition Width="0.95*" />
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,18,0">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="实测条目" />
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" Text="导入真实称重记录，为每一行输入条码和抽样基数，核对实测数量。" />
+                <StackPanel Margin="0,16,0,0" Orientation="Horizontal">
+                  <Button Content="新增条目" Click="AddEntry_Click" Name="RecoveredControl3" />
+                  <Button Content="导入实测Excel" Click="ImportMeasurements_Click" Name="RecoveredControl4" />
+                  <Button Content="导入生产表" Click="ImportProduction_Click" Name="ImportProductionButton" />
+                  <Button Content="删除选中" Click="DeleteEntry_Click" Name="RecoveredControl5" />
+                  <Button Content="检查样品数" Click="CheckSamples_Click" Name="RecoveredControl6" />
+                  <Button Content="导出实测称重表" Click="ExportMeasurements_Click" Name="RecoveredControl7" />
+                </StackPanel>
+              </StackPanel>
+              <DataGrid Name="EntryGrid">
+                <DataGrid.ItemsSource>
+                  <Binding Path="EntryRows" />
+                </DataGrid.ItemsSource>
+                <DataGrid.SelectedItem>
+                  <Binding Path="SelectedEntryRow" Mode="TwoWay" />
+                </DataGrid.SelectedItem>
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="条码" Width="1.4*">
+                    <DataGridTextColumn.Binding>
+                      <Binding Path="Barcode" UpdateSourceTrigger="PropertyChanged" />
+                    </DataGridTextColumn.Binding>
+                  </DataGridTextColumn>
+                  <DataGridTextColumn Header="样品名称" Width="2*" IsReadOnly="True">
+                    <DataGridTextColumn.Binding>
+                      <Binding Path="ProductName" />
+                    </DataGridTextColumn.Binding>
+                  </DataGridTextColumn>
+                  <DataGridTextColumn Header="抽样基数" Width="0.9*">
+                    <DataGridTextColumn.Binding>
+                      <Binding Path="BatchSizeText" UpdateSourceTrigger="PropertyChanged" />
+                    </DataGridTextColumn.Binding>
+                  </DataGridTextColumn>
+                  <DataGridTextColumn Header="实测样品数" Width="0.9*" IsReadOnly="True">
+                    <DataGridTextColumn.Binding>
+                      <Binding Path="MaximumWeightText" UpdateSourceTrigger="PropertyChanged" />
+                    </DataGridTextColumn.Binding>
+                  </DataGridTextColumn>
+                  <DataGridTextColumn Header="应抽样数" Width="0.9*" IsReadOnly="True">
+                    <DataGridTextColumn.Binding>
+                      <Binding Path="RequiredSampleCount" />
+                    </DataGridTextColumn.Binding>
+                  </DataGridTextColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </Border>
+          <StackPanel Grid.Column="1">
+            <Border Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="运行日志" />
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" Text="按应用、操作名和结果查看最近操作记录，便于回溯共享标准库加载和表 2 生成过程。" />
+                <Grid Margin="0,14,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.05*" />
+                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="0.9*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <TextBlock Foreground="{StaticResource MutedBrush}" Text="应用" />
+                    <ComboBox SelectedValuePath="Tag">
+                      <ComboBox.SelectedValue>
+                        <Binding Path="LogApplicationFilter" UpdateSourceTrigger="PropertyChanged" />
+                      </ComboBox.SelectedValue>
+                      <ComboBoxItem Content="全部" Tag="" />
+                      <ComboBoxItem Content="马里奥产品抽检分类系统" Tag="马里奥产品抽检分类系统" />
+                      <ComboBoxItem Content="马里奥产品抽检辅助系统" Tag="马里奥产品抽检辅助系统" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                    <TextBlock Foreground="{StaticResource MutedBrush}" Text="操作名" />
+                    <TextBox>
+                      <TextBox.Text>
+                        <Binding Path="LogOperationFilter" UpdateSourceTrigger="PropertyChanged" />
+                      </TextBox.Text>
+                    </TextBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Foreground="{StaticResource MutedBrush}" Text="结果" />
+                    <ComboBox SelectedValuePath="Tag">
+                      <ComboBox.SelectedValue>
+                        <Binding Path="LogResultFilter" UpdateSourceTrigger="PropertyChanged" />
+                      </ComboBox.SelectedValue>
+                      <ComboBoxItem Content="全部" Tag="" />
+                      <ComboBoxItem Content="成功" Tag="Success" />
+                      <ComboBoxItem Content="失败" Tag="Failure" />
+                    </ComboBox>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                  <Button Content="应用筛选" Click="FilterLogs_Click" Name="RecoveredControl9" />
+                  <Button Content="刷新日志" Click="RefreshLogs_Click" Name="RecoveredControl10" />
+                </StackPanel>
+                <ListBox Name="OperationLogListBox" Margin="0,16,0,0" BorderThickness="0" Background="#00FFFFFF">
+                  <ListBox.ItemsSource>
+                    <Binding Path="OperationLogRows" />
+                  </ListBox.ItemsSource>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Margin="0,0,0,10" Padding="14" CornerRadius="14" Background="#F2F8F0">
+                        <StackPanel>
+                          <TextBlock FontWeight="SemiBold" Foreground="{StaticResource InkBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="Summary" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                          <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="PathSummary" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                          <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="ErrorSummary" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="统一问题汇总" />
+                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}" Text="未知条码、无效抽样基数和导出异常都会集中显示。" />
+                <ListBox Margin="0,16,0,0" BorderThickness="0" Background="#00FFFFFF">
+                  <ListBox.ItemsSource>
+                    <Binding Path="IssueRows" />
+                  </ListBox.ItemsSource>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Margin="0,0,0,10" Padding="14" CornerRadius="14" Background="#EDF7ED">
+                        <StackPanel>
+                          <TextBlock FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="Title" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                          <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource InkBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="Message" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                          <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}">
+                            <TextBlock.Text>
+                              <Binding Path="DetailsText" />
+                            </TextBlock.Text>
+                          </TextBlock>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="实测规则" />
+                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Text="只导出已导入的真实称重记录，统一换算为 g；样品不足时提示缺测，不自动补值或改变测量结果。" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Grid>
+    </ScrollViewer>
+  </Grid>
+</Window>

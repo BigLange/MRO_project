@@ -1,0 +1,100 @@
+{
+  "checks": [
+    {
+      "path": "apps/Mro.HelperApp/App.xaml.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "apps/Mro.HelperApp/MainWindow.xaml.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "apps/Mro.MainApp/App.xaml.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "apps/Mro.MainApp/MainWindow.xaml.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "apps/Shared/WindowSupport.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "installer/Install-MRO.ps1",
+      "parser": "tree-sitter-powershell",
+      "errors": []
+    },
+    {
+      "path": "installer/Uninstall-MRO.ps1",
+      "parser": "tree-sitter-powershell",
+      "errors": []
+    },
+    {
+      "path": "scripts/Package-Windows.ps1",
+      "parser": "tree-sitter-powershell",
+      "errors": []
+    },
+    {
+      "path": "scripts/Test-Windows.ps1",
+      "parser": "tree-sitter-powershell",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/Importers.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/InspectionMetrics.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/Models.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/ProductionImporter.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/TemplateReportExporter.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/UserFolderPreferences.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/WorkbookExports.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/XlsxReader.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "src/Mro.Core/XlsxWriter.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    },
+    {
+      "path": "tests/Mro.Core.Specs/Program.cs",
+      "parser": "tree-sitter-c-sharp",
+      "errors": []
+    }
+  ],
+  "note": "Syntax parsing only. Roslyn compilation, PowerShell execution, console specs and WPF runtime tests have not run."
+}

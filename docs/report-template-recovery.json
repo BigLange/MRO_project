@@ -1,0 +1,13 @@
+{
+  "output": "SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx",
+  "source_sha256": {
+    "检测报告1.xlsx": "dc874b63574b8f848d97e07196e9044ab0503d5724d98886df74fd0fc18403b9",
+    "检测报告2.xlsx": "f2b48bf518fddf90ce224e834f8d8bbe2b9404d3eea22a212ad41106fb72636f"
+  },
+  "notes": [
+    "Fonts, fills, borders, alignment, row/column dimensions and page settings copied from original reports.",
+    "Summary header merges and widths use recovered exporter IL; original historical data and external links removed.",
+    "New conclusions explicitly use legacy-rule review wording; no sensory result or production date is assumed.",
+    "Combined workbook packaging and detail pagination are new; original exporter wrote separate detail and summary files."
+  ]
+}

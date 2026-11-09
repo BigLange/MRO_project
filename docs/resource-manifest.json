@@ -1,0 +1,46 @@
+[
+  {
+    "path": "SharedContent/ReferenceReports/检测报告1.xls",
+    "sha256": "b041f0144311073c9f26e003e2d1aef2bf5bb671a35ad954b909afdc21dc04fc"
+  },
+  {
+    "path": "SharedContent/ReferenceReports/检测报告1.xlsx",
+    "sha256": "dc874b63574b8f848d97e07196e9044ab0503d5724d98886df74fd0fc18403b9"
+  },
+  {
+    "path": "SharedContent/ReferenceReports/检测报告2.xlsx",
+    "sha256": "f2b48bf518fddf90ce224e834f8d8bbe2b9404d3eea22a212ad41106fb72636f"
+  },
+  {
+    "path": "SharedContent/ReportTemplates/MRO-ReportTemplate.xlsx",
+    "sha256": "3a208bdf96c86aae135cc9bcb1c41064ac3a35afe91faa00a43340f48de6eb23"
+  },
+  {
+    "path": "SharedContent/检测标准表.xlsx",
+    "sha256": "7b22f5c8f1cd641f1476cae3be75942688bd6be8ae0ac173562a2917daaaa32a"
+  },
+  {
+    "path": "apps/Mro.HelperApp/Assets/new_mario_app_logo.png",
+    "sha256": "da9f7d2d1a00c3ed82bbca0d36327d6dbb73d5bcdc068c50c0770c54c20ffd5e"
+  },
+  {
+    "path": "apps/Mro.HelperApp/Assets/new_mario_desktop_icon.ico",
+    "sha256": "fc08c0b14f089b212f09a18518a3750bddf4b8ea0c077f62e5983c8e67951451"
+  },
+  {
+    "path": "apps/Mro.HelperApp/Assets/new_mario_title_logo.png",
+    "sha256": "d9344d834b69454b33f652ed99385ce86d7d4a649b4350e2bd9b9d8a77b4b3d8"
+  },
+  {
+    "path": "apps/Mro.MainApp/Assets/main_mario_desktop_icon_red.ico",
+    "sha256": "31e9422be0da5440c25040dc79ca7e498f34dc809c7bcdcbf65cc83fcb87e401"
+  },
+  {
+    "path": "apps/Mro.MainApp/Assets/new_mario_app_logo.png",
+    "sha256": "da9f7d2d1a00c3ed82bbca0d36327d6dbb73d5bcdc068c50c0770c54c20ffd5e"
+  },
+  {
+    "path": "apps/Mro.MainApp/Assets/new_mario_title_logo.png",
+    "sha256": "d9344d834b69454b33f652ed99385ce86d7d4a649b4350e2bd9b9d8a77b4b3d8"
+  }
+]

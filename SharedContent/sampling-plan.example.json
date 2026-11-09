@@ -1,0 +1,82 @@
+[
+  {
+    "MinimumBatch": 1,
+    "MaximumBatch": 20,
+    "SampleCount": 0,
+    "SampleEntireBatch": true,
+    "AllowedT1Count": 0,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 21,
+    "MaximumBatch": 40,
+    "SampleCount": 32,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 1,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 41,
+    "MaximumBatch": 60,
+    "SampleCount": 35,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 1,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 61,
+    "MaximumBatch": 80,
+    "SampleCount": 47,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 2,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 81,
+    "MaximumBatch": 100,
+    "SampleCount": 49,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 2,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 101,
+    "MaximumBatch": 200,
+    "SampleCount": 64,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 3,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 201,
+    "MaximumBatch": 300,
+    "SampleCount": 67,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 3,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 301,
+    "MaximumBatch": 400,
+    "SampleCount": 81,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 4,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 401,
+    "MaximumBatch": 500,
+    "SampleCount": 81,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 4,
+    "AllowedT2Count": 0
+  },
+  {
+    "MinimumBatch": 501,
+    "MaximumBatch": 100000,
+    "SampleCount": 98,
+    "SampleEntireBatch": false,
+    "AllowedT1Count": 5,
+    "AllowedT2Count": 0
+  }
+]
